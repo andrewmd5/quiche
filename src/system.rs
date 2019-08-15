@@ -7,6 +7,10 @@ use winreg::RegKey;
 
 pub type UninstallersResult = Result<Vec<InstalledApp>, &'static str>;
 
+/// dism.exe will return exit code 740 if it is launched
+/// from a non-elevated process.
+static ELEVATION_REQUIRED: i32 = 740;
+
 #[derive(Debug, Clone, Default)]
 /// Contains system information that was retreived from ```system::get_system_info()```
 pub struct SystemInfo {
@@ -38,7 +42,7 @@ struct DismPackage {
     install_time: String,
 }
 
-/// Returns a struct that contains basic info on the host system. 
+/// Returns a struct that contains basic info on the host system.
 /// That includes whether Rainway supports its, the CPU architecture,
 /// OS name, and if it is Windows N/KN.  
 pub fn get_system_info() -> Result<SystemInfo, &'static str> {
@@ -55,16 +59,13 @@ pub fn get_system_info() -> Result<SystemInfo, &'static str> {
     };
     system_info.is_n_edition = re.is_match(&system_info.product_name);
     //this key will be missing on any non-Windows 10, Windows Server 2016 & 2019.
-    let current_major_version_number: u32 = match cur_ver.get_value("CurrentMajorVersionNumber") { 
+    let current_major_version_number: u32 = match cur_ver.get_value("CurrentMajorVersionNumber") {
         Err(_error) => 0,
         Ok(p) => p,
     };
     //We only support the above mentioned operating systems.
     system_info.is_supported = current_major_version_number == 10;
-    system_info.is_x64 = match is_x64() {
-        Err(error) => return Err(error),
-        Ok(b) => b,
-    };
+    system_info.is_x64 = is_x64()?;
     Ok(system_info)
 }
 
@@ -85,7 +86,7 @@ fn is_x64() -> Result<bool, &'static str> {
 }
 
 /// Determines if Windows N/KN users have the Media Feature Pack installed.
-/// Windows N/KN do not have required codecs installed by default, so we need to prompt users. 
+/// Windows N/KN do not have required codecs installed by default, so we need to prompt users.
 /// This function requires the process to be elevated.
 pub fn needs_media_pack() -> Result<bool, &'static str> {
     let tool = "dism";
@@ -96,7 +97,7 @@ pub fn needs_media_pack() -> Result<bool, &'static str> {
         Ok(o) => o,
     };
     let exit_code = process.status.code().expect("Could not unwrap error code.");
-    if exit_code == 740 {
+    if exit_code == ELEVATION_REQUIRED {
         return Err("Elevated permissions are required to run DISM.");
     }
     let mut packages: Vec<DismPackage> = Vec::new();
@@ -132,12 +133,8 @@ pub fn is_rainway_installed() -> Result<bool, &'static str> {
         Ok(u) => u,
         Err(error) => return Err(error),
     };
-    for uninstaller in uninstallers {
-        if uninstaller.name == "Rainway" {
-            return Ok(true);
-        }
-    }
-    Ok(false)
+    //wow, I was wondering if there was an `any` trait like LINQ
+    Ok(uninstallers.into_iter().any(|u| u.name == "Rainway"))
 }
 
 /// Runs the downloaded Rainway installer and waits for it to complete.

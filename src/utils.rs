@@ -9,11 +9,11 @@ use std::{fs, io};
 /// Release info is pulled from a remote JSON config [here](https://releases.rainway.com/Installer_current.json).
 /// The information located inside that config can be used to form a download URL.
 pub struct ReleaseInfo {
-    /// The prefix on our installer. 
+    /// The prefix on our installer.
     pub name: String,
     /// The current release version.
     pub version: String,
-    /// The SHA256 hash of the installer. 
+    /// The SHA256 hash of the installer.
     /// Used to validate if the file downloaded properly.
     pub hash: String,
 }
@@ -26,5 +26,5 @@ pub fn hash_file(path: &PathBuf) -> Option<String> {
         io::copy(&mut file, &mut sha256).unwrap_or(0);
         return Some(format!("{:X}", sha256.result()));
     };
-    Some("".to_string())
+    None
 }

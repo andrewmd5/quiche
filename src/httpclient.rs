@@ -26,10 +26,7 @@ pub fn download_json<T>(url: &str) -> Result<T, String>
 where
     T: DeserializeOwned,
 {
-    let mut response = match reqwest::get(url) {
-        Err(e) => return Err(e.to_string()),
-        Ok(o) => o,
-    };
+    let mut response = reqwest::get(url).map_err(|e| e.to_string())?;
     if !response.status().is_success() {
         return Err(format!(
             "Failed to fetch JSON from '{}' HTTP STATUS Code == {}",
@@ -49,10 +46,7 @@ where
 /// Downloads a file from a remote URL and saves it to the output path supplied.
 pub fn download_file(url: &str, path: &PathBuf) -> Result<bool, String> {
     let client = Client::new();
-    let head_response = match client.head(url).send() {
-        Err(e) => return Err(e.to_string()),
-        Ok(r) => r,
-    };
+    let head_response = client.head(url).send().map_err(|e| e.to_string())?;
     if !head_response.status().is_success() {
         return Err(format!(
             "Couldn't download URL: {}. Error: {}",
@@ -95,10 +89,7 @@ pub fn download_file(url: &str, path: &PathBuf) -> Result<bool, String> {
                  .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
                  .progress_chars("#>-"));
 
-    let get_response = match request.send() {
-        Err(e) => return Err(e.to_string()),
-        Ok(r) => r,
-    };
+    let get_response = request.send().map_err(|e| e.to_string())?;
     let mut source = DownloadProgress {
         progress_bar: pb,
         inner: get_response,
