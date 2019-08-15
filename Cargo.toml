@@ -1,0 +1,31 @@
+[package]
+name = "rainway_bootstrapper"
+version = "0.1.0"
+authors = ["Andrew Sampson <andrew@rainway.com>"]
+edition = "2018"
+build = "build.rs"
+
+[package.metadata.winres]
+ProductName = "Rainway Bootstrapper"
+OriginalFilename = "rainway_bootstrapper.exe"
+FileDescription = "Rainway Bootstrapper 🍔🦋😒"
+LegalCopyright = "Copyright © 2019"
+
+[build-dependencies]
+winres = "0.1"
+
+[dependencies]
+sha2 = "0.8.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+indicatif = "0.11.0"
+reqwest = "0.9.19"
+winreg = "0.6"
+regex = "1"
+winres = "0.1.11"
+
+[profile.release]
+codegen-units = 1
+opt-level = 'z'
+lto = true
+panic = 'abort'
