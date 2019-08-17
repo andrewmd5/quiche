@@ -3,6 +3,7 @@ extern crate regex;
 extern crate reqwest;
 extern crate serde;
 extern crate serde_json;
+extern crate web_view;
 extern crate winreg;
 
 mod berror;
@@ -13,52 +14,33 @@ mod utils;
 use berror::BootstrapError;
 use std::env;
 use utils::ReleaseInfo;
+use web_view::*;
 
 fn main() -> Result<(), BootstrapError> {
-    let system_info = match system::get_system_info() {
-        Ok(s) => s,
-        Err(error) => return Err(BootstrapError::new(error)),
-    };
+    let system_info = system::get_system_info()?;
+
     if !system_info.is_x64 {
-        return Err(BootstrapError::new(
-            "Rainway is only supported by x64 operating systems.",
-        ));
+        return Err(BootstrapError::ArchitectureUnsupported);
     }
     if !system_info.is_supported {
-        return Err(BootstrapError::new(
-            "Rainway is only supported on Windows 10 and Windows Server 2016+.",
-        ));
+        return Err(BootstrapError::WindowsVersionUnsupported);
     }
-    if system_info.is_n_edition {
-        match system::needs_media_pack() {
-            Ok(needs_media_pack) => {
-                if needs_media_pack {
-                    return Err(BootstrapError::new(&format!(
-                        "Please install the Windows Media Pack for {}",
-                        system_info.product_name
-                    )));
-                }
-            }
-            Err(error) => return Err(BootstrapError::new(error)),
-        };
-    }
-    match system::is_rainway_installed() {
-        Ok(is_installed) => {
-            if is_installed {
-                return Err(BootstrapError::new(
-                    "Rainway is already installed on this system.",
-                ));
-            }
-        }
-        Err(error) => return Err(BootstrapError::new(error)),
-    };
 
-    let release_info = match httpclient::download_json::<ReleaseInfo>(
+    if system_info.is_n_edition {
+        if system::needs_media_pack()? {
+            return Err(BootstrapError::NeedWindowsMediaPack);
+        }
+    }
+
+    println!("{}", BootstrapError::ElevationRequired);
+
+    if system::is_rainway_installed()? {
+        return Err(BootstrapError::AlreadyInstalled);
+    }
+
+    let release_info = httpclient::download_json::<ReleaseInfo>(
         "https://releases.rainway.com/Installer_current.json",
-    ) {
-        Ok(s) => s,
-        Err(error) => return Err(BootstrapError::new(&error)),
-    };
+    )?;
 
     let install_url = format!(
         "https://releases.rainway.com/{}_{}.exe",
@@ -71,19 +53,14 @@ fn main() -> Result<(), BootstrapError> {
         release_info.name, release_info.version
     ));
 
-    match httpclient::download_file(install_url.as_str(), &download_path) {
-        Ok(f) => f,
-        Err(error) => return Err(BootstrapError::new(&error)),
-    };
+    httpclient::download_file(install_url.as_str(), &download_path)?;
+
     if utils::hash_file(&download_path).unwrap() != release_info.hash {
-        return Err(BootstrapError::new(
-            "Downloaded installer has an invalid signature.",
-        ));
+        return Err(BootstrapError::SignatureMismatch);
     }
-    match system::run_intaller(&download_path) {
-        Ok(f) => f,
-        Err(error) => return Err(BootstrapError::new(&error)),
-    };
+
+    system::run_intaller(&download_path)?;
+
     println!("Rainway installed!");
     Ok(())
 }

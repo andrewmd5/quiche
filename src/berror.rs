@@ -1,29 +1,43 @@
 use std::error::Error;
+use std::fmt;
 use std::fmt::{Display, Formatter, Result};
 
 #[derive(Debug)]
-pub struct BootstrapError {
-    pub details: String,
-    pub code: u32,
+pub enum BootstrapError {
+    ElevationRequired,
+    DismFailed(String),
+    ArchitectureUnsupported,
+    WindowsVersionUnsupported,
+    NeedWindowsMediaPack,
+    AlreadyInstalled,
+    RegistryKeyNotFound(String),
+    RegistryValueNotFound(String),
+    HttpFailed(u16, String),
+    JsonParseFailure,
+    SignatureMismatch,
+    InstallerDownloadFailed,
+    InstallationFailed(String),
+    RequestError(reqwest::Error),
+    IOError(std::io::Error),
 }
 
-impl BootstrapError {
-    pub fn new(msg: &str) -> BootstrapError {
-        BootstrapError {
-            details: msg.to_string(),
-            code: 0, //TODO error codes.
+impl fmt::Display for BootstrapError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self {
+            ElevationRequired => write!(f, ": "),
+            _ => write!(f, "{}", 2),
         }
     }
 }
 
-impl Display for BootstrapError {
-    fn fmt(&self, f: &mut Formatter) -> Result {
-        write!(f, "{}, {}", self.details, self.code)
+impl From<reqwest::Error> for BootstrapError {
+    fn from(error: reqwest::Error) -> Self {
+        BootstrapError::RequestError(error)
     }
 }
 
-impl Error for BootstrapError {
-    fn description(&self) -> &str {
-        &self.details
+impl From<std::io::Error> for BootstrapError {
+    fn from(error: std::io::Error) -> Self {
+        BootstrapError::IOError(error)
     }
 }

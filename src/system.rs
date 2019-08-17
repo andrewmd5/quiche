@@ -1,11 +1,10 @@
+use crate::berror::BootstrapError;
 use regex::Regex;
 use std::path::Path;
 use std::process::Command;
 use std::str;
 use winreg::enums::*;
 use winreg::RegKey;
-
-pub type UninstallersResult = Result<Vec<InstalledApp>, &'static str>;
 
 /// dism.exe will return exit code 740 if it is launched
 /// from a non-elevated process.
@@ -45,16 +44,22 @@ struct DismPackage {
 /// Returns a struct that contains basic info on the host system.
 /// That includes whether Rainway supports its, the CPU architecture,
 /// OS name, and if it is Windows N/KN.  
-pub fn get_system_info() -> Result<SystemInfo, &'static str> {
+pub fn get_system_info() -> Result<SystemInfo, BootstrapError> {
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let cur_ver = match hklm.open_subkey("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion") {
-        Err(_e) => return Err("Unable to open CurrentVersion under Windows NT."),
+    let version_path = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion";
+    let cur_ver = match hklm.open_subkey(version_path) {
+        Err(_e) => {
+            return Err(BootstrapError::RegistryKeyNotFound(
+                version_path.to_string(),
+            ))
+        }
         Ok(o) => o,
     };
     let mut system_info = SystemInfo::default();
     let re = Regex::new("(N|KN)").unwrap();
-    system_info.product_name = match cur_ver.get_value("ProductName") {
-        Err(_error) => return Err("Unable to find ProductName value."),
+    let pn = "ProductName";
+    system_info.product_name = match cur_ver.get_value(pn) {
+        Err(_error) => return Err(BootstrapError::RegistryValueNotFound(pn.to_string())),
         Ok(p) => p,
     };
     system_info.is_n_edition = re.is_match(&system_info.product_name);
@@ -70,17 +75,17 @@ pub fn get_system_info() -> Result<SystemInfo, &'static str> {
 }
 
 /// Parses the registry to determine if the host OS is x32 or x64.
-fn is_x64() -> Result<bool, &'static str> {
+fn is_x64() -> Result<bool, BootstrapError> {
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let environment = match hklm
-        .open_subkey("SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment")
-    {
-        Err(_e) => return Err("Problem opening registry the key for Environment"),
+    let env = "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment";
+    let environment = match hklm.open_subkey(env) {
+        Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(env.to_string())),
         Ok(o) => o,
     };
-    let processor_architecture: String = match environment.get_value("PROCESSOR_ARCHITECTURE") {
+    let arch_key = "PROCESSOR_ARCHITECTURE";
+    let processor_architecture: String = match environment.get_value(arch_key) {
         Ok(v) => v,
-        Err(_error) => return Err("Problem opening PROCESSOR_ARCHITECTURE key"),
+        Err(_error) => return Err(BootstrapError::RegistryValueNotFound(arch_key.to_string())),
     };
     Ok(processor_architecture == "AMD64")
 }
@@ -88,17 +93,17 @@ fn is_x64() -> Result<bool, &'static str> {
 /// Determines if Windows N/KN users have the Media Feature Pack installed.
 /// Windows N/KN do not have required codecs installed by default, so we need to prompt users.
 /// This function requires the process to be elevated.
-pub fn needs_media_pack() -> Result<bool, &'static str> {
+pub fn needs_media_pack() -> Result<bool, BootstrapError> {
     let tool = "dism";
     let args = ["/Online", "/Get-Packages"];
 
     let process = match Command::new(tool).args(&args).output() {
-        Err(_e) => return Err("failed to execute dism"),
+        Err(e) => return Err(BootstrapError::DismFailed(e.to_string())),
         Ok(o) => o,
     };
     let exit_code = process.status.code().expect("Could not unwrap error code.");
     if exit_code == ELEVATION_REQUIRED {
-        return Err("Elevated permissions are required to run DISM.");
+        return Err(BootstrapError::ElevationRequired);
     }
     let mut packages: Vec<DismPackage> = Vec::new();
     let mut package = DismPackage::default();
@@ -128,32 +133,30 @@ pub fn needs_media_pack() -> Result<bool, &'static str> {
 }
 /// Derives if Rainway is currently installed based on
 /// the list of installed applications for the current user.
-pub fn is_rainway_installed() -> Result<bool, &'static str> {
-    let uninstallers = match get_uninstallers() {
-        Ok(u) => u,
-        Err(error) => return Err(error),
-    };
+pub fn is_rainway_installed() -> Result<bool, BootstrapError> {
+    let uninstallers = get_uninstallers()?;
+
     //wow, I was wondering if there was an `any` trait like LINQ
     Ok(uninstallers.into_iter().any(|u| u.name == "Rainway"))
 }
 
 /// Runs the downloaded Rainway installer and waits for it to complete.
-pub fn run_intaller(path: &Path) -> Result<bool, String> {
+pub fn run_intaller(path: &Path) -> Result<bool, BootstrapError> {
     let installer = match Command::new(path).args(&[""]).output() {
-        Err(_e) => return Err(_e.to_string()),
+        Err(e) => return Err(BootstrapError::InstallationFailed(e.to_string())),
         Ok(o) => o,
     };
     Ok(installer.status.success())
 }
 
 /// Returns a list of all the installed software for the current user.
-fn get_uninstallers() -> UninstallersResult {
+fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let uninstall_key =
-        match hkcu.open_subkey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall") {
-            Ok(u) => u,
-            Err(_e) => return Err("Problem opening uninstall_key"),
-        };
+    let u_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+    let uninstall_key = match hkcu.open_subkey(u_key) {
+        Ok(u) => u,
+        Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(u_key.to_string())),
+    };
     let mut apps: Vec<InstalledApp> = Vec::new();
     for key in uninstall_key
         .enum_keys()
