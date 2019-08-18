@@ -28,3 +28,7 @@ pub fn hash_file(path: &PathBuf) -> Option<String> {
     };
     None
 }
+/// checks if the executable has been compiled against a x64 target.
+pub fn is_compiled_for_64_bit() -> bool {
+    cfg!(target_pointer_width = "64")
+}

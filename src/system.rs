@@ -2,7 +2,6 @@ use crate::berror::BootstrapError;
 use regex::Regex;
 use std::path::Path;
 use std::process::Command;
-use std::str;
 use winreg::enums::*;
 use winreg::RegKey;
 

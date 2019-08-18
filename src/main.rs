@@ -17,6 +17,10 @@ use utils::ReleaseInfo;
 use web_view::*;
 
 fn main() -> Result<(), BootstrapError> {
+    if !cfg!(debug_assertions) && utils::is_compiled_for_64_bit() {
+        panic!("Buiild against i686-pc-windows-msvc for production releases.")
+    }
+
     let system_info = system::get_system_info()?;
 
     if !system_info.is_x64 {
@@ -28,11 +32,11 @@ fn main() -> Result<(), BootstrapError> {
 
     if system_info.is_n_edition {
         if system::needs_media_pack()? {
-            return Err(BootstrapError::NeedWindowsMediaPack);
+            return Err(BootstrapError::NeedWindowsMediaPack(
+                system_info.product_name,
+            ));
         }
     }
-
-    println!("{}", BootstrapError::ElevationRequired);
 
     if system::is_rainway_installed()? {
         return Err(BootstrapError::AlreadyInstalled);
@@ -61,6 +65,5 @@ fn main() -> Result<(), BootstrapError> {
 
     system::run_intaller(&download_path)?;
 
-    println!("Rainway installed!");
     Ok(())
 }

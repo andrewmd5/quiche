@@ -36,7 +36,7 @@ where
     let mut json = String::new();
     response.read_to_string(&mut json)?;
     match serde_json::from_str(&json) {
-        Err(e) => return Err(BootstrapError::JsonParseFailure),
+        Err(_e) => return Err(BootstrapError::JsonParseFailure),
         Ok(model) => return Ok(model),
     };
 }
@@ -45,10 +45,7 @@ pub fn download_file(url: &str, path: &PathBuf) -> Result<bool, BootstrapError> 
     let client = Client::new();
     let head_response = client.head(url).send()?;
     if !head_response.status().is_success() {
-        return Err(BootstrapError::HttpFailed(
-            head_response.status().as_u16(),
-            url.to_string(),
-        ));
+        return Err(BootstrapError::InstallerDownloadFailed);
     }
     let total_size = head_response
         .headers()
@@ -57,10 +54,7 @@ pub fn download_file(url: &str, path: &PathBuf) -> Result<bool, BootstrapError> 
         .and_then(|ct_len| ct_len.parse().ok())
         .unwrap_or(0);
     if total_size <= 0 {
-        return Err(BootstrapError::HttpFailed(
-            404,
-            "remote file is empty.".to_string(),
-        ));
+        return Err(BootstrapError::InstallerDownloadFailed);
     }
 
     let mut temp_file = OpenOptions::new()
