@@ -19,6 +19,7 @@ LegalCopyright = "Copyright © 2019"
 winres = "0.1"
 
 [dependencies]
+threadpool = "1.0"
 web-view = "0.4.1"
 sha2 = "0.8.0"
 serde = { version = "1.0", features = ["derive"] }

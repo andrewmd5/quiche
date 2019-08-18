@@ -20,9 +20,10 @@ pub enum BootstrapError {
     WebView(web_view::Error)
 }
 
+
 #[allow(non_snake_case)]
 impl fmt::Display for BootstrapError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             BootstrapError::ElevationRequired => write!(f, "Please run the Rainway Boostrapper as Administrator."),
             BootstrapError::DismFailed(ref s) => write!(f, "DISM failed to launch: {0}", s),
@@ -39,7 +40,7 @@ impl fmt::Display for BootstrapError {
             BootstrapError::InstallationFailed(ref s) => write!(f, "An error occured installing the latest update: {0}", s),
             BootstrapError::RequestError(ref e) => write!(f, "An unknown network issue was encountered: {0}", e),
             BootstrapError::IOError(ref e) => write!(f, "An unknown issue was encountered: {0}", e),
-            BootstrapError::WebView(ref e) => write!(f, "An unknown UI issue was encountered: {0}", e)
+            BootstrapError::WebView(ref e) => write!(f, "An unknown UI issue was encountered: {0}", e),
         }
     }
 }
