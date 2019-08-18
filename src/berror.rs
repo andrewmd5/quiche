@@ -17,6 +17,7 @@ pub enum BootstrapError {
     InstallationFailed(String),
     RequestError(reqwest::Error),
     IOError(std::io::Error),
+    WebView(web_view::Error)
 }
 
 #[allow(non_snake_case)]
@@ -37,8 +38,14 @@ impl fmt::Display for BootstrapError {
             BootstrapError::InstallerDownloadFailed => write!(f, "We were unable to downloaded the latest Rainway update. Please exit and try again."),
             BootstrapError::InstallationFailed(ref s) => write!(f, "An error occured installing the latest update: {0}", s),
             BootstrapError::RequestError(ref e) => write!(f, "An unknown network issue was encountered: {0}", e),
-            BootstrapError::IOError(ref e) => write!(f, "An unknown issue was encountered: {0}", e)
+            BootstrapError::IOError(ref e) => write!(f, "An unknown issue was encountered: {0}", e),
+            BootstrapError::WebView(ref e) => write!(f, "An unknown UI issue was encountered: {0}", e)
         }
+    }
+}
+impl From<web_view::Error> for BootstrapError {
+    fn from(error: web_view::Error) -> Self {
+        BootstrapError::WebView(error)
     }
 }
 

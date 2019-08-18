@@ -43,13 +43,15 @@ fn main() -> Result<(), BootstrapError> {
     }
 
     let release_info = httpclient::download_json::<ReleaseInfo>(
-        "https://releases.rainway.com/Installer_current.json",
+        env!("RAINWAY_RELEASE_URL"),
     )?;
 
     let install_url = format!(
-        "https://releases.rainway.com/{}_{}.exe",
+        env!("RAINWAY_DOWNLOAD_FORMAT"),
         release_info.name, release_info.version
     );
+
+
 
     let mut download_path = env::temp_dir();
     download_path.push(format!(
