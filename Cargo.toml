@@ -20,7 +20,6 @@ winres = "0.1"
 
 [dependencies]
 web-view = "0.4.1"
-tether = "0.3.5"
 sha2 = "0.8.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
