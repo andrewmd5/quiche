@@ -2,17 +2,16 @@
 //#![windows_subsystem = "windows"]
 
 mod berror;
+mod callback;
 mod httpclient;
 mod system;
 mod utils;
-mod callback;
-
 
 use berror::BootstrapError;
 use std::env;
+use std::process;
 use utils::ReleaseInfo;
 use web_view::*;
-use std::process;
 
 fn main() -> Result<(), BootstrapError> {
     if !cfg!(debug_assertions) && utils::is_compiled_for_64_bit() {
@@ -37,12 +36,16 @@ fn main() -> Result<(), BootstrapError> {
 }
 
 //TODO break each call out into an async call so we can produce results on the UI
-fn setup_rainway<T: 'static>(webview: &mut WebView<T>, callback: String, error: String)  {
-      callback::run_async(webview, || {
-        system::get_system_info().map_err(|err| format!("{}", err))
-            .map(|output| format!("'{}'", output.product_name))
+fn setup_rainway<T: 'static>(webview: &mut WebView<T>, callback: String, error: String) {
+    callback::run_async(
+        webview,
+        || {
+            system::get_system_info()
+                .map_err(|err| format!("{}", err))
+                .map(|output| format!("'{}'", output.product_name))
         },
-        callback, error
+        callback,
+        error,
     );
 }
 
@@ -94,9 +97,7 @@ fn setup() -> Result<(), BootstrapError> {
 fn invoke_handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str) -> WVResult {
     println!("INVOKED");
     match arg {
-        "test" => {
-           setup_rainway(webview, "test".to_string(), "error".to_string())
-        },
+        "test" => setup_rainway(webview, "test".to_string(), "error".to_string()),
         "exit" => {
             process::exit(0x0100);
         }

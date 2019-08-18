@@ -1,8 +1,6 @@
 extern crate winres;
 
-
 const TOML: &'static str = include_str!("Cargo.toml");
-
 
 pub fn find_cargo_field(key: &'static str) -> &'static str {
     if let Some(line) = TOML.split("\n").find(|x| x.starts_with(key)) {
@@ -14,11 +12,16 @@ pub fn find_cargo_field(key: &'static str) -> &'static str {
     }
 }
 
-
 fn main() {
     if cfg!(target_os = "windows") {
-        println!("cargo:rustc-env=RAINWAY_RELEASE_URL={}", find_cargo_field("release_url"));
-         println!("cargo:rustc-env=RAINWAY_DOWNLOAD_FORMAT={}", find_cargo_field("downloaded_format"));
+        println!(
+            "cargo:rustc-env=RAINWAY_RELEASE_URL={}",
+            find_cargo_field("release_url")
+        );
+        println!(
+            "cargo:rustc-env=RAINWAY_DOWNLOAD_FORMAT={}",
+            find_cargo_field("downloaded_format")
+        );
         let mut res = winres::WindowsResource::new();
         res.set_manifest_file("manifest.xml");
         res.compile().unwrap();

@@ -17,9 +17,8 @@ pub enum BootstrapError {
     InstallationFailed(String),
     RequestError(reqwest::Error),
     IOError(std::io::Error),
-    WebView(web_view::Error)
+    WebView(web_view::Error),
 }
-
 
 #[allow(non_snake_case)]
 impl fmt::Display for BootstrapError {
