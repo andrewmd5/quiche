@@ -12,7 +12,7 @@ downloaded_format = "https://releases.rainway.com/{}_{}.exe"
 [package.metadata.winres]
 ProductName = "Rainway Bootstrapper"
 OriginalFilename = "rainway_bootstrapper.exe"
-FileDescription = "Rainway Bootstrapper 🍔🦋😒"
+FileDescription = "Rainway Bootstrapper"
 LegalCopyright = "Copyright © 2019"
 
 [build-dependencies]
