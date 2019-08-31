@@ -1,7 +1,7 @@
-use winapi::shared::windef::{HWND, LPRECT, RECT};
+use winapi::shared::windef::{RECT};
 use winapi::um::wincon::GetConsoleWindow;
 use winapi::um::winuser::{
-    GetDesktopWindow, GetWindowRect, MoveWindow, SetWindowPos, HWND_NOTOPMOST, SWP_NOMOVE, SWP_NOSIZE,
+    GetDesktopWindow, GetWindowRect, MoveWindow, SetWindowPos, HWND_NOTOPMOST,
     SWP_SHOWWINDOW,
 };
 
@@ -34,8 +34,8 @@ pub fn center_window() {
         let width = console_rect.right - console_rect.left;
         let height = console_rect.bottom - console_rect.top;
 
-        let console_x = ((desktop_rect.right - desktop_rect.left) / 2 - width / 2);
-        let console_y = ((desktop_rect.bottom - desktop_rect.top) / 2 - height / 2);
+        let console_x = (desktop_rect.right - desktop_rect.left) / 2 - width / 2;
+        let console_y = (desktop_rect.bottom - desktop_rect.top) / 2 - height / 2;
 
         //SetWindowPos(GetConsoleWindow(),NULL,ConsolePosX,ConsolePosY, Width, Height, SWP_SHOWWINDOW || SWP_NOSIZE);
 
