@@ -4,6 +4,7 @@ use winapi::um::winuser::{
     GetDesktopWindow, GetWindowRect, MoveWindow, SetWindowPos, HWND_NOTOPMOST, SWP_SHOWWINDOW,
 };
 
+///centers the current console window to the center of the primary screen.
 pub fn center_window() {
     unsafe {
         let mut desktop_rect: RECT = RECT {

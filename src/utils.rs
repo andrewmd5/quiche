@@ -35,6 +35,7 @@ pub fn is_compiled_for_64_bit() -> bool {
     cfg!(target_pointer_width = "64")
 }
 
+/// opens a URL in the systems default web browser.
 pub fn open_url(url: &'static str) {
     use winapi::shared::winerror::SUCCEEDED;
     use winapi::um::combaseapi::{CoInitializeEx, CoUninitialize};
