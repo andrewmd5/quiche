@@ -33,9 +33,7 @@ where
             url.to_string(),
         ));
     }
-   
-    let mut json = String::new();
-    response.read_to_string(&mut json)?;
+    let json = response.text()?;
     match serde_json::from_str(&json) {
         Err(_e) => return Err(BootstrapError::JsonParseFailure),
         Ok(model) => return Ok(model),

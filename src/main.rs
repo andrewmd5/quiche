@@ -27,7 +27,7 @@ fn main() -> Result<(), BootstrapError> {
                 format!("{}", e),
                 env!("MEDIA_PACK_URL"),
             ),
-            _ => return Err(e), //gui::messagebox::show_error(caption, format!("{}", e)),
+            _ => gui::messagebox::show_error(caption, format!("{}", e)),
         },
     }
     Ok(())
@@ -55,17 +55,13 @@ fn setup() -> Result<(), BootstrapError> {
         return Err(BootstrapError::AlreadyInstalled);
     }
 
-    
-
+    println!("Fetching release information...");
     let release_info = httpclient::download_json::<ReleaseInfo>(env!("RAINWAY_RELEASE_URL"))?;
-    
 
     let install_url = format!(
         env!("RAINWAY_DOWNLOAD_FORMAT"),
         release_info.name, release_info.version
     );
-
-   
 
     let mut download_path = env::temp_dir();
     download_path.push(format!(
@@ -73,16 +69,15 @@ fn setup() -> Result<(), BootstrapError> {
         release_info.name, release_info.version
     ));
 
-   
-
+    println!("Downloading Rainway {}", release_info.version);
     httpclient::download_file(install_url.as_str(), &download_path)?;
 
+    println!("Verifying download...");
     if utils::hash_file(&download_path).unwrap() != release_info.hash {
         return Err(BootstrapError::SignatureMismatch);
     }
-
+    println!("Installing Rainway!");
     system::run_intaller(&download_path)?;
-
     Ok(())
 }
 
