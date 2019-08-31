@@ -12,12 +12,12 @@ pub enum BootstrapError {
     RegistryValueNotFound(String),
     HttpFailed(u16, String),
     JsonParseFailure,
+    BootstrapperExist,
     SignatureMismatch,
     InstallerDownloadFailed,
     InstallationFailed(String),
     RequestError(reqwest::Error),
     IOError(std::io::Error),
-    WebView(web_view::Error),
 }
 
 #[allow(non_snake_case)]
@@ -28,8 +28,8 @@ impl fmt::Display for BootstrapError {
             BootstrapError::DismFailed(ref s) => write!(f, "DISM failed to launch: {0}", s),
             BootstrapError::ArchitectureUnsupported => write!(f, "Rainway is currently only supported by x64 operating systems."),
             BootstrapError::WindowsVersionUnsupported => write!(f, "Rainway is currently only supported on Windows 10 and Windows Server 2016+."),
-            BootstrapError::NeedWindowsMediaPack(ref s) => write!(f, "A required video codec is missing from your system. Please install the Windows Media Pack for {}", s),
-            BootstrapError::AlreadyInstalled => write!(f, "Rainway is already installed."),
+            BootstrapError::NeedWindowsMediaPack(ref s) => write!(f, "A required video codec is missing from your system. Please install the Windows Media Pack for {}.\n\nPress \"Ok\" to open the codec download page.", s),
+            BootstrapError::AlreadyInstalled => write!(f, "Rainway is already installed on this computer."),
             BootstrapError::RegistryKeyNotFound(ref s) => write!(f, "An error occured accessing Windows Registry key: {}.", s),
             BootstrapError::RegistryValueNotFound(ref s) => write!(f, "An error occured accessing Windows Registry value: {}.", s),
             BootstrapError::HttpFailed(ref c, ref s) => write!(f, "Network connection issue occured accessing {}: {}.", s, c),
@@ -39,13 +39,8 @@ impl fmt::Display for BootstrapError {
             BootstrapError::InstallationFailed(ref s) => write!(f, "An error occured installing the latest update: {0}", s),
             BootstrapError::RequestError(ref e) => write!(f, "An unknown network issue was encountered: {0}", e),
             BootstrapError::IOError(ref e) => write!(f, "An unknown issue was encountered: {0}", e),
-            BootstrapError::WebView(ref e) => write!(f, "An unknown UI issue was encountered: {0}", e),
+            BootstrapError::BootstrapperExist => write!(f, "Another instance of the Rainway Bootstrapper is already running."),
         }
-    }
-}
-impl From<web_view::Error> for BootstrapError {
-    fn from(error: web_view::Error) -> Self {
-        BootstrapError::WebView(error)
     }
 }
 

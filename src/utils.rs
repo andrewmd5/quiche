@@ -2,7 +2,9 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::io::Seek;
 use std::path::PathBuf;
+use std::ptr;
 use std::{fs, io};
+use widestring::U16CString;
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
@@ -31,4 +33,34 @@ pub fn hash_file(path: &PathBuf) -> Option<String> {
 /// checks if the executable has been compiled against a x64 target.
 pub fn is_compiled_for_64_bit() -> bool {
     cfg!(target_pointer_width = "64")
+}
+
+pub fn open_url(url: &'static str) {
+    use winapi::shared::winerror::SUCCEEDED;
+    use winapi::um::combaseapi::{CoInitializeEx, CoUninitialize};
+    use winapi::um::objbase::{COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE};
+    use winapi::um::shellapi::ShellExecuteW;
+    use winapi::um::winuser::SW_SHOWNORMAL;
+
+    static OPEN: &[u16] = &['o' as u16, 'p' as u16, 'e' as u16, 'n' as u16, 0x0000];
+    let url = U16CString::from_str(url).unwrap();
+
+    unsafe {
+        let coinitializeex_result = CoInitializeEx(
+            ptr::null_mut(),
+            COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE,
+        );
+        let code = ShellExecuteW(
+            ptr::null_mut(),
+            OPEN.as_ptr(),
+            url.as_ptr(),
+            ptr::null(),
+            ptr::null(),
+            SW_SHOWNORMAL,
+        ) as usize as i32;
+        if SUCCEEDED(coinitializeex_result) {
+            CoUninitialize();
+        }
+        code
+    };
 }

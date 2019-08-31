@@ -22,6 +22,10 @@ fn main() {
             "cargo:rustc-env=RAINWAY_DOWNLOAD_FORMAT={}",
             find_cargo_field("downloaded_format")
         );
+        println!(
+            "cargo:rustc-env=MEDIA_PACK_URL={}",
+            find_cargo_field("media_pack_url")
+        );
         let mut res = winres::WindowsResource::new();
         res.set_manifest_file("manifest.xml");
         res.compile().unwrap();
