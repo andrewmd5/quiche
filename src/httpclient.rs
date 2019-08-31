@@ -33,6 +33,7 @@ where
             url.to_string(),
         ));
     }
+   
     let mut json = String::new();
     response.read_to_string(&mut json)?;
     match serde_json::from_str(&json) {

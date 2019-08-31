@@ -7,9 +7,6 @@ mod httpclient;
 mod system;
 mod utils;
 
-
-
-
 use berror::BootstrapError;
 use std::env;
 use utils::ReleaseInfo;
@@ -18,19 +15,26 @@ fn main() -> Result<(), BootstrapError> {
     if !cfg!(debug_assertions) && utils::is_compiled_for_64_bit() {
         panic!("Buiild against i686-pc-windows-msvc for production releases.")
     }
-    let caption = "Rainway Setup Error"; 
+    gui::window::center_window();
+    println!("{}", LOGO);
+    println!("Please pardon our old school look. We're working on a beautiful new GUI, but Rainway's setup is so fast you'll be gaming in no time!");
+    let caption = "Rainway Setup Error";
     match setup() {
-        Ok(_) =>  return Ok(()),
+        Ok(_) => return Ok(()),
         Err(e) => match e {
-            BootstrapError::NeedWindowsMediaPack(_)  => gui::messagebox::show_error_with_url(caption, format!("{}", e), env!("MEDIA_PACK_URL")),
-            _ =>  gui::messagebox::show_error(caption, format!("{}", e))
-        }
+            BootstrapError::NeedWindowsMediaPack(_) => gui::messagebox::show_error_with_url(
+                caption,
+                format!("{}", e),
+                env!("MEDIA_PACK_URL"),
+            ),
+            _ => return Err(e), //gui::messagebox::show_error(caption, format!("{}", e)),
+        },
     }
     Ok(())
 }
 
-
 fn setup() -> Result<(), BootstrapError> {
+    system::is_bootstrapper_running()?;
     let system_info = system::get_system_info()?;
     if !system_info.is_x64 {
         return Err(BootstrapError::ArchitectureUnsupported);
@@ -51,18 +55,25 @@ fn setup() -> Result<(), BootstrapError> {
         return Err(BootstrapError::AlreadyInstalled);
     }
 
+    
+
     let release_info = httpclient::download_json::<ReleaseInfo>(env!("RAINWAY_RELEASE_URL"))?;
+    
 
     let install_url = format!(
         env!("RAINWAY_DOWNLOAD_FORMAT"),
         release_info.name, release_info.version
     );
 
+   
+
     let mut download_path = env::temp_dir();
     download_path.push(format!(
         "{}_{}.exe",
         release_info.name, release_info.version
     ));
+
+   
 
     httpclient::download_file(install_url.as_str(), &download_path)?;
 
@@ -74,3 +85,17 @@ fn setup() -> Result<(), BootstrapError> {
 
     Ok(())
 }
+
+const LOGO: &str = r#"
+ ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄  ▄▄▄▄▄▄▄▄▄▄▄  ▄▄        ▄  ▄         ▄  ▄▄▄▄▄▄▄▄▄▄▄  ▄         ▄ 
+▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌▐░░▌      ▐░▌▐░▌       ▐░▌▐░░░░░░░░░░░▌▐░▌       ▐░▌
+▐░█▀▀▀▀▀▀▀█░▌▐░█▀▀▀▀▀▀▀█░▌ ▀▀▀▀█░█▀▀▀▀ ▐░▌░▌     ▐░▌▐░▌       ▐░▌▐░█▀▀▀▀▀▀▀█░▌▐░▌       ▐░▌
+▐░▌       ▐░▌▐░▌       ▐░▌     ▐░▌     ▐░▌▐░▌    ▐░▌▐░▌       ▐░▌▐░▌       ▐░▌▐░▌       ▐░▌
+▐░█▄▄▄▄▄▄▄█░▌▐░█▄▄▄▄▄▄▄█░▌     ▐░▌     ▐░▌ ▐░▌   ▐░▌▐░▌   ▄   ▐░▌▐░█▄▄▄▄▄▄▄█░▌▐░█▄▄▄▄▄▄▄█░▌
+▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌     ▐░▌     ▐░▌  ▐░▌  ▐░▌▐░▌  ▐░▌  ▐░▌▐░░░░░░░░░░░▌▐░░░░░░░░░░░▌
+▐░█▀▀▀▀█░█▀▀ ▐░█▀▀▀▀▀▀▀█░▌     ▐░▌     ▐░▌   ▐░▌ ▐░▌▐░▌ ▐░▌░▌ ▐░▌▐░█▀▀▀▀▀▀▀█░▌ ▀▀▀▀█░█▀▀▀▀ 
+▐░▌     ▐░▌  ▐░▌       ▐░▌     ▐░▌     ▐░▌    ▐░▌▐░▌▐░▌▐░▌ ▐░▌▐░▌▐░▌       ▐░▌     ▐░▌     
+▐░▌      ▐░▌ ▐░▌       ▐░▌ ▄▄▄▄█░█▄▄▄▄ ▐░▌     ▐░▐░▌▐░▌░▌   ▐░▐░▌▐░▌       ▐░▌     ▐░▌     
+▐░▌       ▐░▌▐░▌       ▐░▌▐░░░░░░░░░░░▌▐░▌      ▐░░▌▐░░▌     ▐░░▌▐░▌       ▐░▌     ▐░▌     
+ ▀         ▀  ▀         ▀  ▀▀▀▀▀▀▀▀▀▀▀  ▀        ▀▀  ▀▀       ▀▀  ▀         ▀       ▀      
+"#;

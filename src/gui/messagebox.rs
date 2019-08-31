@@ -1,7 +1,7 @@
 use crate::utils;
 use std::ffi::CString;
 use user32::MessageBoxA;
-use winapi::um::winuser::{MB_ICONERROR, MB_ICONINFORMATION, MB_OK};
+use winapi::um::winuser::{MB_ICONERROR, MB_OK};
 
 pub fn show_error(caption: &'static str, text: String) {
     let lp_caption = CString::new(caption).unwrap();
@@ -13,7 +13,6 @@ pub fn show_error(caption: &'static str, text: String) {
             lp_caption.as_ptr(),
             MB_OK | MB_ICONERROR,
         );
-        println!("Closed {} ", button_id);
     }
 }
 

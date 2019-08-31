@@ -3,9 +3,9 @@ use regex::Regex;
 use std::path::Path;
 use std::process;
 use std::process::Command;
+use sysinfo::{ProcessExt, SystemExt};
 use winreg::enums::*;
 use winreg::RegKey;
-use sysinfo::{ProcessExt, Signal, SystemExt};
 
 /// dism.exe will return exit code 740 if it is launched
 /// from a non-elevated process.
@@ -43,9 +43,9 @@ struct DismPackage {
 }
 
 pub fn is_bootstrapper_running() -> Result<(), BootstrapError> {
-     let mut sys = sysinfo::System::new();
-     let current_pid =  process::id();
-     for (pid, proc_) in sys.get_process_list() {
+    let sys = sysinfo::System::new();
+    let current_pid = process::id();
+    for (pid, proc_) in sys.get_process_list() {
         if proc_.name() == "rainway_bootstrapper.exe" && (*pid as u32) != current_pid {
             return Err(BootstrapError::BootstrapperExist);
         }
