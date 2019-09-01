@@ -31,6 +31,7 @@ pub struct InstalledApp {
     pub uninstall_string: String,
     pub install_location: String,
     pub name: String,
+    pub version: String,
 }
 
 #[derive(Clone, Default)]
@@ -187,10 +188,14 @@ fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
             app.uninstall_string = install_key
                 .get_value("UninstallString")
                 .unwrap_or(String::from(""));
+            app.version = install_key
+                .get_value("DisplayVersion")
+                .unwrap_or(String::from(""));
 
             if !app.name.is_empty()
                 && !app.install_location.is_empty()
                 && !app.uninstall_string.is_empty()
+                && !app.version.is_empty()
             {
                 apps.push(app);
             }

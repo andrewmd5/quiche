@@ -5,6 +5,7 @@ mod berror;
 mod gui;
 mod httpclient;
 mod system;
+mod updater;
 mod utils;
 
 use berror::BootstrapError;
@@ -16,7 +17,9 @@ fn main() -> Result<(), BootstrapError> {
         panic!("Buiild against i686-pc-windows-msvc for production releases.")
     }
     gui::window::center_window();
-    println!("{}", LOGO);
+
+    updater::create_snapshot_manifest("E:\\Snapshots\\1.0.0", "E:\\Snapshots\\1.0.1");
+    /*println!("{}", LOGO);
     println!("Please pardon our old school look. We're working on a beautiful new GUI, but Rainway's setup is so fast you'll be gaming in no time!");
     let caption = "Rainway Setup Error";
     match setup() {
@@ -29,7 +32,7 @@ fn main() -> Result<(), BootstrapError> {
             ),
             _ => gui::messagebox::show_error(caption, format!("{}", e)),
         },
-    }
+    }*/
     Ok(())
 }
 
