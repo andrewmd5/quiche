@@ -11,3 +11,6 @@
 - Create a sane way to send progress reports to the webview UI without blocking.
 - Add commandline arguments that make it easy to interface with the process from C#.
 - Self-updating functionality for the actual bootstrapper 
+
+
+![](https://i.imgur.com/Hkm3NIg.png)
