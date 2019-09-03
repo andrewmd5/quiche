@@ -1,0 +1,11 @@
+
+fresh_files = ["hello.txt", "/folder/me.txt"] # not used by the updater, however it allows us to track changes.
+deleted_files = ["dog.txt"] # A list of all the files deleted as compared to the last version. 
+                            # Allows the bootstrapper to delete them.
+[package]
+zip = "https://releases.rainway.com/1.0.1/package.zip" # The URL to the zip package containing all the new files.
+hash = "SHA256" # A hash of the zip package, used to verify it downloaded properly.
+
+[installer]
+url = "https://releases.rainway.com/1.0.1/installer.exe" # The URL of the actual full installer.
+hash = "SHA256" # The hash of the installer to verify it downloaded properly.

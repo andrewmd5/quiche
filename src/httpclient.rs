@@ -21,6 +21,25 @@ impl<R: Read> Read for DownloadProgress<R> {
     }
 }
 
+/// Downloads a remote TOML string and deseralizes it into a provided <T> generic.
+pub fn download_toml<T>(url: &str) -> Result<T, BootstrapError>
+where
+    T: DeserializeOwned,
+{
+    let mut response = reqwest::get(url)?;
+    if !response.status().is_success() {
+        return Err(BootstrapError::HttpFailed(
+            response.status().as_u16(),
+            url.to_string(),
+        ));
+    }
+    let toml = response.text()?;
+    match toml::from_str(&toml) {
+        Err(_e) => return Err(BootstrapError::TomlParseFailure),
+        Ok(model) => return Ok(model),
+    };
+}
+
 /// Downloads a remote JSON string and deseralizes it into a provided <T> generic.
 pub fn download_json<T>(url: &str) -> Result<T, BootstrapError>
 where

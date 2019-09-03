@@ -1,0 +1,9 @@
+base_manifest_url = "https://releases.rainway.com/{}/manifest.toml" 
+
+[versions]
+# The current version of Rainway
+current = "1.0.5"
+
+# All past versions of Rainway, listed in descending order.
+# This will allow any version of Rainway to upgrade to the latest.
+past = ["1.0.4", "1.0.3", "1.0.2", "1.0.1", "1.0.0"]
