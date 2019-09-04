@@ -1,9 +1,8 @@
-use crate::berror::BootstrapError;
+use crate::etc::constants::BootstrapError;
 use regex::Regex;
 use std::path::Path;
 use std::process;
 use std::process::Command;
-use sysinfo::{ProcessExt, SystemExt};
 use winreg::enums::*;
 use winreg::RegKey;
 
@@ -41,17 +40,6 @@ struct DismPackage {
     state: String,
     release_type: String,
     install_time: String,
-}
-
-pub fn is_bootstrapper_running() -> Result<(), BootstrapError> {
-    let sys = sysinfo::System::new();
-    let current_pid = process::id();
-    for (pid, proc_) in sys.get_process_list() {
-        if proc_.name() == "rainway_bootstrapper.exe" && (*pid as u32) != current_pid {
-            return Err(BootstrapError::BootstrapperExist);
-        }
-    }
-    Ok(())
 }
 
 /// Returns a struct that contains basic info on the host system.
@@ -144,26 +132,9 @@ pub fn needs_media_pack() -> Result<bool, BootstrapError> {
     }
     Ok(true)
 }
-/// Derives if Rainway is currently installed based on
-/// the list of installed applications for the current user.
-pub fn is_rainway_installed() -> Result<bool, BootstrapError> {
-    let uninstallers = get_uninstallers()?;
-
-    //wow, I was wondering if there was an `any` trait like LINQ
-    Ok(uninstallers.into_iter().any(|u| u.name == "Rainway"))
-}
-
-/// Runs the downloaded Rainway installer and waits for it to complete.
-pub fn run_intaller(path: &Path) -> Result<bool, BootstrapError> {
-    let installer = match Command::new(path).args(&[""]).output() {
-        Err(e) => return Err(BootstrapError::InstallationFailed(e.to_string())),
-        Ok(o) => o,
-    };
-    Ok(installer.status.success())
-}
 
 /// Returns a list of all the installed software for the current user.
-fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
+pub fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let u_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
     let uninstall_key = match hkcu.open_subkey(u_key) {
@@ -202,4 +173,36 @@ fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
         }
     }
     Ok(apps)
+}
+
+/// opens a URL in the systems default web browser.
+pub fn open_url(url: &'static str) {
+    use winapi::shared::winerror::SUCCEEDED;
+    use winapi::um::combaseapi::{CoInitializeEx, CoUninitialize};
+    use winapi::um::objbase::{COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE};
+    use winapi::um::shellapi::ShellExecuteW;
+    use winapi::um::winuser::SW_SHOWNORMAL;
+    use widestring::U16CString;
+    use std::ptr;
+
+    static OPEN: &[u16] = &['o' as u16, 'p' as u16, 'e' as u16, 'n' as u16, 0x0000];
+    let url = U16CString::from_str(url).unwrap();
+    unsafe {
+        let coinitializeex_result = CoInitializeEx(
+            ptr::null_mut(),
+            COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE,
+        );
+        let code = ShellExecuteW(
+            ptr::null_mut(),
+            OPEN.as_ptr(),
+            url.as_ptr(),
+            ptr::null(),
+            ptr::null(),
+            SW_SHOWNORMAL,
+        ) as usize as i32;
+        if SUCCEEDED(coinitializeex_result) {
+            CoUninitialize();
+        }
+        code
+    };
 }

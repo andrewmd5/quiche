@@ -26,6 +26,10 @@ fn main() {
             "cargo:rustc-env=MEDIA_PACK_URL={}",
             find_cargo_field("media_pack_url")
         );
+         println!(
+            "cargo:rustc-env=SENTRY_DNS={}",
+            find_cargo_field("sentry_dns")
+        );
         let mut res = winres::WindowsResource::new();
         res.set_manifest_file("manifest.xml");
         res.compile().unwrap();

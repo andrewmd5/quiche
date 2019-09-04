@@ -1,5 +1,5 @@
-use crate::berror::BootstrapError;
-use indicatif::{ProgressBar, ProgressStyle};
+use crate::etc::constants::BootstrapError;
+use crate::Progress;
 use reqwest::{header, Client};
 use serde::de::DeserializeOwned;
 use serde_json;
@@ -9,13 +9,19 @@ use std::path::PathBuf;
 
 struct DownloadProgress<R> {
     inner: R,
-    progress_bar: ProgressBar,
+    progress: std::sync::Arc<std::sync::RwLock<Progress>>,
 }
 
 impl<R: Read> Read for DownloadProgress<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf).map(|n| {
-            self.progress_bar.inc(n as u64);
+           
+            let mut writer = self.progress.write().unwrap();
+             if !writer.started {
+                writer.started = true;
+            }
+            writer.current += n as u64;
+            drop(writer);
             n
         })
     }
@@ -58,8 +64,13 @@ where
         Ok(model) => return Ok(model),
     };
 }
+
 /// Downloads a file from a remote URL and saves it to the output path supplied.
-pub fn download_file(url: &str, path: &PathBuf) -> Result<bool, BootstrapError> {
+pub fn download_file(
+    r: std::sync::Arc<std::sync::RwLock<Progress>>,
+    url: &str,
+    path: &PathBuf,
+) -> Result<bool, BootstrapError> {
     let client = Client::new();
     let head_response = client.head(url).send()?;
     if !head_response.status().is_success() {
@@ -83,14 +94,13 @@ pub fn download_file(url: &str, path: &PathBuf) -> Result<bool, BootstrapError> 
 
     let request = client.get(url);
 
-    let pb = ProgressBar::new(total_size);
-    pb.set_style(ProgressStyle::default_bar()
-                 .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-                 .progress_chars("#>-"));
+    let mut writer = r.write().unwrap();
+    writer.len = total_size;
+    drop(writer);
 
     let get_response = request.send()?;
     let mut source = DownloadProgress {
-        progress_bar: pb,
+        progress: r,
         inner: get_response,
     };
     match copy(&mut source, &mut temp_file) {

@@ -1,15 +1,19 @@
-use crate::httpclient::download_toml;
+use crate::callback;
+use crate::httpclient::{download_json, download_toml};
+use crate::rainway::get_version;
 use crate::utils::hash_file;
+use crate::utils::ReleaseInfo;
 use serde::Deserialize;
+use std::env;
 use std::fs::{self, DirEntry};
 use std::io;
 use std::path::Path;
+use web_view::WebView;
+use web_view::*;
 
 #[derive(Deserialize)]
 /// Holds information about various Rainway releases
 struct Releases {
-    /// A URL string that can be formatted to get the manifest URL for a version.
-    base_manifest_url: String,
     versions: Versions,
 }
 
@@ -24,32 +28,32 @@ struct Versions {
 }
 
 #[derive(Deserialize)]
-struct Update {
+pub struct Update {
     /// Not used by the updater, however it allows us to track changes.
-    fresh_files: Vec<String>,
+    pub fresh_files: Vec<String>,
     /// A list of all the files deleted as compared to the last version.
     /// Allows the bootstrapper to delete them.
-    deleted_files: Vec<String>,
+    pub deleted_files: Vec<String>,
     /// The update package.
-    package: Package,
+    pub package: Package,
     /// The full installer.
-    installer: Installer,
+    pub installer: Installer,
 }
 
 #[derive(Deserialize)]
-struct Installer {
+pub struct Installer {
     /// The URL of the actual full installer.
-    url: String,
+    pub url: String,
     /// The hash of the installer to verify it downloaded properly.
-    hash: String,
+    pub hash: String,
 }
 
 #[derive(Deserialize)]
-struct Package {
+pub struct Package {
     /// The URL to the zip package containing all the new files.
-    zip: String,
+    pub zip: String,
     /// A hash of the zip package, used to verify it downloaded properly.
-    hash: String,
+    pub hash: String,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -59,28 +63,65 @@ struct FileInfo {
     pub hash: String,
 }
 
-pub fn get_releases() {
-    let my_version = "1.0.2";
-    let mut releases = download_toml::<Releases>("http://192.168.153.1:8080/Releases.toml").unwrap();
+//Checks for and returns any required updates the current installation needs
+pub fn check_for_updates() -> Option<Vec<Update>> {
+    let installed_version = get_version(); //TODO check if pulled. If issue, return false.
+                                       //TODO check if downloaded/parsed. If issue, return false.
+    let mut releases =
+        download_toml::<Releases>("http://192.168.153.1:8080/Releases.toml").unwrap();
     releases.versions.past.reverse();
-    if my_version == releases.versions.current {
-        println!("Rainway up-to-date");
-    } else {
-
-        let installed_version_index = releases
-            .versions
-            .past
-            .iter()
-            .position(|r| r == my_version)
-            .unwrap();
-
-        for i in installed_version_index+1..releases.versions.past.len()  {
-            println!("Need to update to version {} ", releases.versions.past[i]);
-        }
-
-       
+    if installed_version == releases.versions.current {
+        println!("Rainway is up-to-date.");
+        return None;
     }
+    let latest_manifest_url = format!(
+        "http://192.168.153.1:8080/{}/manifest.toml",
+        releases.versions.current
+    );
+    //TODO check if we could download the latest manifest
+    let latest_manifest = download_toml::<Update>(&latest_manifest_url).unwrap();
+
+    //TODO safely check if the currently installed version is the last good version
+    //then return it since we only need _this_ update
+    if releases.versions.past.last().unwrap() == &installed_version {
+        return Some(vec![latest_manifest]);
+    }
+    let mut updates: Vec<Update> = Vec::new();
+    // TODO check if this is a valid version safely
+    let installed_version_index = releases
+        .versions
+        .past
+        .iter()
+        .position(|r| r == &installed_version)
+        .unwrap();
+
+    //TODO get all inbetween updates safely
+    for i in installed_version_index + 1..releases.versions.past.len() {
+        let version_manifest_url = format!(
+            "http://192.168.153.1:8080/{}/manifest.toml",
+            releases.versions.past[i]
+        );
+        let version_manifest = download_toml::<Update>(&version_manifest_url).unwrap();
+        updates.push(version_manifest);
+    }
+    updates.push(latest_manifest);
+    Some(updates)
 }
+
+//gets the latest Rainway release. Used for installing Rainway.
+pub fn get_latest_release() -> Option<Update> {
+    let mut releases =
+        download_toml::<Releases>("http://192.168.153.1:8080/Releases.toml").unwrap();
+    let latest_manifest_url = format!(
+        "http://192.168.153.1:8080/{}/manifest.toml",
+        releases.versions.current
+    );
+    //TODO check if we could download the latest manifest
+    let latest_manifest = download_toml::<Update>(&latest_manifest_url).unwrap();
+    Some(latest_manifest)
+}
+
+pub fn download_package() {}
 
 pub fn create_snapshot_manifest(previous_version: &str, new_version: &str) {
     let old_path = Path::new(previous_version);

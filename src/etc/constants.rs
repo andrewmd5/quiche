@@ -19,6 +19,7 @@ pub enum BootstrapError {
     InstallationFailed(String),
     RequestError(reqwest::Error),
     IOError(std::io::Error),
+    WebView(web_view::Error),
 }
 
 #[allow(non_snake_case)]
@@ -42,6 +43,7 @@ impl fmt::Display for BootstrapError {
             BootstrapError::RequestError(ref e) => write!(f, "An unknown network issue was encountered: {0}", e),
             BootstrapError::IOError(ref e) => write!(f, "An unknown issue was encountered: {0}", e),
             BootstrapError::BootstrapperExist => write!(f, "Another instance of the Rainway Bootstrapper is already running."),
+             BootstrapError::WebView(ref e) => write!(f, "An unknown UI issue was encountered: {0}", e),
         }
     }
 }
@@ -56,4 +58,15 @@ impl From<std::io::Error> for BootstrapError {
     fn from(error: std::io::Error) -> Self {
         BootstrapError::IOError(error)
     }
+}
+
+impl From<web_view::Error> for BootstrapError {
+    fn from(error: web_view::Error) -> Self {
+        BootstrapError::WebView(error)
+    }
+}
+
+/// checks if the executable has been compiled against a x64 target.
+pub fn is_compiled_for_64_bit() -> bool {
+    cfg!(target_pointer_width = "64")
 }

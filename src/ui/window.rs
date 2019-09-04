@@ -1,8 +1,23 @@
 use winapi::shared::windef::RECT;
 use winapi::um::wincon::GetConsoleWindow;
 use winapi::um::winuser::{
-    GetDesktopWindow, GetWindowRect, MoveWindow, SetWindowPos, HWND_NOTOPMOST, SWP_SHOWWINDOW,
+    GetDesktopWindow, GetWindowRect, MoveWindow, SetWindowPos, ShowWindow, HWND_NOTOPMOST, SWP_SHOWWINDOW, SW_HIDE
 };
+use std::ptr;
+
+pub fn set_dpi_aware() {
+    use winapi::um::shellscalingapi::{SetProcessDpiAwareness, PROCESS_SYSTEM_DPI_AWARE};
+    unsafe { SetProcessDpiAwareness(PROCESS_SYSTEM_DPI_AWARE) };
+}
+
+pub fn hide_console_window() {
+    let window = unsafe {GetConsoleWindow()};
+    if window != ptr::null_mut() {
+        unsafe {
+            ShowWindow(window, SW_HIDE);
+        }
+    }
+}
 
 ///centers the current console window to the center of the primary screen.
 pub fn center_window() {

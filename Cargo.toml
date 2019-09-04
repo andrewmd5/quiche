@@ -9,6 +9,7 @@ build = "build.rs"
 release_url = "https://releases.rainway.com/Installer_current.json"
 downloaded_format = "https://releases.rainway.com/{}_{}.exe"
 media_pack_url = "https://www.microsoft.com/en-us/software-download/mediafeaturepack"
+sentry_dns = "https://f3f4e8ff17b04538bffd1e8794e1dc05@sentry.io/1548204"
 
 [package.metadata.winres]
 ProductName = "Rainway Bootstrapper"
@@ -20,19 +21,18 @@ LegalCopyright = "Copyright © 2019"
 winres = "0.1"
 
 [dependencies]
+threadpool = "1.0"
+web-view = "0.4.1"
 toml = "0.5.3"
 sysinfo = "0.9.2"
 sha2 = "0.8.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-indicatif = "0.11.0"
 reqwest = "0.9.19"
 winreg = "0.6"
 regex = "1"
-winres = "0.1.11"
 widestring = "0.4.0"
-winapi = { version = "0.3.8", features = ["winuser", "combaseapi", "objbase", "shellapi"] }
-user32-sys = "0.2.0"
+winapi = { version = "0.3.8", features = ["winuser", "combaseapi", "objbase", "shellapi", "shellscalingapi"] }
 sentry = { version = "0.12.0", features = ["with_device_info", "with_panic", "with_rust_info"] } 
 
 [profile.release]
