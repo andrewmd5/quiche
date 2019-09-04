@@ -1,39 +1,72 @@
-use crate::callback;
-use crate::httpclient::{download_json, download_toml};
-use crate::rainway::get_version;
-use crate::utils::hash_file;
-use crate::utils::ReleaseInfo;
+use crate::io::hash::sha_256;
+use crate::net::http::{download_json, download_toml};
 use serde::Deserialize;
-use std::env;
-use std::fs::{self, DirEntry};
-use std::io;
+use std::fs;
 use std::path::Path;
-use web_view::WebView;
-use web_view::*;
 
-#[derive(Deserialize)]
-/// Holds information about various Rainway releases
-struct Releases {
-    versions: Versions,
+#[derive(Debug)]
+pub enum ReleaseBranch {
+    Stable,
+    Beta,
+    Nightly,
+}
+
+/// The various states an update can be in.
+#[derive(Debug)]
+pub enum UpdateState {
+    /// None means the update/installation has not started.
+    None,
+    /// Failed signifies that the update failed,
+    /// usually because the download encountered an issue.
+    /// This can come in the form of network errors
+    /// or the wrong has returning
+    Failed,
+    /// If we are rolling back the update failed to apply
+    /// the new files to disk.
+    RollingBack,
+    /// The update package or installer is downloading.
+    Downloading,
+    /// The update is being validated by hashing the downloaded
+    /// package or installer to check if it matches the manifest.
+    Validating,
+    /// The update is being written to disk.
+    Applying,
+    /// The update was applied successfully.
+    Done,
+}
+
+#[derive(Default)]
+pub struct ActiveUpdate {
+    pub state: UpdateState,
+    pub total_bytes: u64,
+    pub downloaded_bytes: u64,
+    pub branch: Branch
+}
+
+#[derive(Deserialize, Default)]
+pub struct Branch {
+    /// The version of the active branch.
+    pub version: String,
+    /// The URL to the manifest file of the branches latest release.
+    pub manifest_url: String,
+    /// The full manifest for the branch.
+    pub manifest: Option<Manifest>,
 }
 
 #[derive(Deserialize)]
-/// A structure that presents various versions of Rainway
-struct Versions {
-    /// The current version of Rainway
-    current: String,
-    /// All past versions of Rainway, listed in descending order.
-    /// This will allow any version of Rainway to upgrade to the latest.
-    past: Vec<String>,
+pub struct Releases {
+    /// The stable branch, used by default.
+    pub stable: Branch,
+    /// The beta branch, not used right now, but can be used for
+    /// doing things such as 10% rollouts.
+    pub beta: Branch,
+    /// The nightly branch, not used now, but can be used for people
+    /// who want bleeding edge changes.
+    pub nightly: Branch,
 }
 
 #[derive(Deserialize)]
-pub struct Update {
-    /// Not used by the updater, however it allows us to track changes.
-    pub fresh_files: Vec<String>,
-    /// A list of all the files deleted as compared to the last version.
-    /// Allows the bootstrapper to delete them.
-    pub deleted_files: Vec<String>,
+pub struct Manifest {
     /// The update package.
     pub package: Package,
     /// The full installer.
@@ -51,115 +84,68 @@ pub struct Installer {
 #[derive(Deserialize)]
 pub struct Package {
     /// The URL to the zip package containing all the new files.
-    pub zip: String,
+    pub url: String,
     /// A hash of the zip package, used to verify it downloaded properly.
     pub hash: String,
+    /// A vector of all the files present inside the package.
+    pub files: Vec<String>,
 }
 
-#[derive(Debug, Clone, Default)]
-struct FileInfo {
-    pub full_path: String,
-    pub path: String,
-    pub hash: String,
-}
-
-//Checks for and returns any required updates the current installation needs
-pub fn check_for_updates() -> Option<Vec<Update>> {
-    let installed_version = get_version(); //TODO check if pulled. If issue, return false.
-                                       //TODO check if downloaded/parsed. If issue, return false.
-    let mut releases =
-        download_toml::<Releases>("http://192.168.153.1:8080/Releases.toml").unwrap();
-    releases.versions.past.reverse();
-    if installed_version == releases.versions.current {
-        println!("Rainway is up-to-date.");
-        return None;
-    }
-    let latest_manifest_url = format!(
-        "http://192.168.153.1:8080/{}/manifest.toml",
-        releases.versions.current
-    );
-    //TODO check if we could download the latest manifest
-    let latest_manifest = download_toml::<Update>(&latest_manifest_url).unwrap();
-
-    //TODO safely check if the currently installed version is the last good version
-    //then return it since we only need _this_ update
-    if releases.versions.past.last().unwrap() == &installed_version {
-        return Some(vec![latest_manifest]);
-    }
-    let mut updates: Vec<Update> = Vec::new();
-    // TODO check if this is a valid version safely
-    let installed_version_index = releases
-        .versions
-        .past
-        .iter()
-        .position(|r| r == &installed_version)
-        .unwrap();
-
-    //TODO get all inbetween updates safely
-    for i in installed_version_index + 1..releases.versions.past.len() {
-        let version_manifest_url = format!(
-            "http://192.168.153.1:8080/{}/manifest.toml",
-            releases.versions.past[i]
-        );
-        let version_manifest = download_toml::<Update>(&version_manifest_url).unwrap();
-        updates.push(version_manifest);
-    }
-    updates.push(latest_manifest);
-    Some(updates)
-}
-
-//gets the latest Rainway release. Used for installing Rainway.
-pub fn get_latest_release() -> Option<Update> {
-    let mut releases =
-        download_toml::<Releases>("http://192.168.153.1:8080/Releases.toml").unwrap();
-    let latest_manifest_url = format!(
-        "http://192.168.153.1:8080/{}/manifest.toml",
-        releases.versions.current
-    );
-    //TODO check if we could download the latest manifest
-    let latest_manifest = download_toml::<Update>(&latest_manifest_url).unwrap();
-    Some(latest_manifest)
-}
-
-pub fn download_package() {}
-
-pub fn create_snapshot_manifest(previous_version: &str, new_version: &str) {
-    let old_path = Path::new(previous_version);
-    let new_path = Path::new(new_version);
-
-    let old_files = visit_dirs(old_path, previous_version).unwrap();
-    let new_files = visit_dirs(new_path, new_version).unwrap();
-
-    let deleted_files: Vec<FileInfo> = old_files
-        .into_iter()
-        .filter(|x| !new_files.clone().into_iter().any(|u| u.path == x.path))
-        .collect();
-
-    for df in deleted_files {
-        println!("{} {}", df.path, df.full_path);
-    }
-}
-
-fn visit_dirs(dir: &Path, version: &str) -> Option<Vec<FileInfo>> {
-    if dir.is_dir() {
-        let mut files: Vec<FileInfo> = Vec::new();
-        for entry in fs::read_dir(dir).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            if path.is_dir() {
-                if let Some(mut f) = visit_dirs(&path, version) {
-                    files.append(&mut f);
-                }
-            } else {
-                let full = path.as_path().to_str().unwrap();
-                files.push(FileInfo {
-                    full_path: full.to_string(),
-                    path: full.to_string().replace(version, ""),
-                    hash: hash_file(&path).unwrap(),
-                });
-            }
+/// fetches all the available releases for each branch.
+fn get_releases() -> Option<Releases> {
+    match download_toml::<Releases>("http://local.vg:8080/Releases.toml") {
+        Ok(r) => return Some(r),
+        Err(e) => {
+            // Send just in case its not a network error.
+            sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
+            // This is an unrecoverable issue.
+            return None;
         }
-        return Some(files);
     }
+}
+
+/// fetches the latest version of a branch and it's release manifest.
+pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
+    let mut releases = match get_releases() {
+        None => return None,
+        Some(r) => r,
+    };
+    println!("pulling the latest release for the {:?} branch", branch);
+    releases.stable.manifest = match download_toml::<Manifest>(&releases.stable.manifest_url) {
+        Ok(m) => Some(m),
+        Err(e) => {
+            sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
+            // This is an unrecoverable issue, so we return None 
+            // and present a generic error message.
+            return None;
+        }
+    };
+    Some(releases.stable)
+}
+
+pub fn download_release() {
+
+}
+
+/// gets the latest Rainway 1.0 release. Used for installing Rainway.
+pub fn get_latest_release_legacy() -> Option<ReleaseInfo> {
+    if let Ok(info) = download_json::<ReleaseInfo>(env!("RAINWAY_RELEASE_URL")) {
+        return Some(info);
+    };
     None
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "PascalCase")]
+/// DEPRECATED
+/// Release info is pulled from a remote JSON config [here](https://releases.rainway.com/Installer_current.json).
+/// The information located inside that config can be used to form a download URL.
+pub struct ReleaseInfo {
+    /// The prefix on our installer.
+    pub name: String,
+    /// The current release version.
+    pub version: String,
+    /// The SHA256 hash of the installer.
+    /// Used to validate if the file downloaded properly.
+    pub hash: String,
 }

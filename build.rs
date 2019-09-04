@@ -26,7 +26,7 @@ fn main() {
             "cargo:rustc-env=MEDIA_PACK_URL={}",
             find_cargo_field("media_pack_url")
         );
-         println!(
+        println!(
             "cargo:rustc-env=SENTRY_DNS={}",
             find_cargo_field("sentry_dns")
         );

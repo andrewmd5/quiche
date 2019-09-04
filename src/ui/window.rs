@@ -1,9 +1,10 @@
+use std::ptr;
 use winapi::shared::windef::RECT;
 use winapi::um::wincon::GetConsoleWindow;
 use winapi::um::winuser::{
-    GetDesktopWindow, GetWindowRect, MoveWindow, SetWindowPos, ShowWindow, HWND_NOTOPMOST, SWP_SHOWWINDOW, SW_HIDE
+    GetDesktopWindow, GetWindowRect, MoveWindow, SetWindowPos, ShowWindow, HWND_NOTOPMOST,
+    SWP_SHOWWINDOW, SW_HIDE,
 };
-use std::ptr;
 
 pub fn set_dpi_aware() {
     use winapi::um::shellscalingapi::{SetProcessDpiAwareness, PROCESS_SYSTEM_DPI_AWARE};
@@ -11,7 +12,7 @@ pub fn set_dpi_aware() {
 }
 
 pub fn hide_console_window() {
-    let window = unsafe {GetConsoleWindow()};
+    let window = unsafe { GetConsoleWindow() };
     if window != ptr::null_mut() {
         unsafe {
             ShowWindow(window, SW_HIDE);

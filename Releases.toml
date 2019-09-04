@@ -1,11 +1,11 @@
 [stable]
 version = "2.0.0"
-manifest = "https://url.com"
+manifest_url = "http://local.vg:8080/2.0.0/manifest.toml"
 
 [beta]
 version = "0.0.0"
-manifest = ""
+manifest_url = ""
 
 [nightly]
 version = "0.0.0"
-manifest = ""
+manifest_url = ""

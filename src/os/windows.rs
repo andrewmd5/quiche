@@ -177,13 +177,13 @@ pub fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
 
 /// opens a URL in the systems default web browser.
 pub fn open_url(url: &'static str) {
+    use std::ptr;
+    use widestring::U16CString;
     use winapi::shared::winerror::SUCCEEDED;
     use winapi::um::combaseapi::{CoInitializeEx, CoUninitialize};
     use winapi::um::objbase::{COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE};
     use winapi::um::shellapi::ShellExecuteW;
     use winapi::um::winuser::SW_SHOWNORMAL;
-    use widestring::U16CString;
-    use std::ptr;
 
     static OPEN: &[u16] = &['o' as u16, 'p' as u16, 'e' as u16, 'n' as u16, 0x0000];
     let url = U16CString::from_str(url).unwrap();

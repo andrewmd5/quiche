@@ -1,3 +1,4 @@
+use crate::updater::{UpdateState, ReleaseBranch};
 use std::fmt;
 
 #[derive(Debug)]
@@ -11,6 +12,7 @@ pub enum BootstrapError {
     RegistryKeyNotFound(String),
     RegistryValueNotFound(String),
     HttpFailed(u16, String),
+    ReleaseLookupFailed,
     TomlParseFailure,
     JsonParseFailure,
     BootstrapperExist,
@@ -43,7 +45,8 @@ impl fmt::Display for BootstrapError {
             BootstrapError::RequestError(ref e) => write!(f, "An unknown network issue was encountered: {0}", e),
             BootstrapError::IOError(ref e) => write!(f, "An unknown issue was encountered: {0}", e),
             BootstrapError::BootstrapperExist => write!(f, "Another instance of the Rainway Bootstrapper is already running."),
-             BootstrapError::WebView(ref e) => write!(f, "An unknown UI issue was encountered: {0}", e),
+            BootstrapError::WebView(ref e) => write!(f, "An unknown UI issue was encountered: {0}", e),
+            BootstrapError::ReleaseLookupFailed => write!(f, "Looks like something went wrong. We were unable to determine the latest Rainway release. Please exit and try again."),
         }
     }
 }
@@ -63,6 +66,24 @@ impl From<std::io::Error> for BootstrapError {
 impl From<web_view::Error> for BootstrapError {
     fn from(error: web_view::Error) -> Self {
         BootstrapError::WebView(error)
+    }
+}
+
+impl Default for UpdateState {
+    fn default() -> UpdateState {
+        UpdateState::None
+    }
+}
+
+impl fmt::Display for UpdateState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl fmt::Display for  ReleaseBranch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 

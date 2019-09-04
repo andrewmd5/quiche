@@ -1,4 +1,4 @@
-use crate::os::windows::{open_url};
+use crate::os::windows::open_url;
 use std::ffi::CString;
 use winapi::um::winuser::MessageBoxA;
 use winapi::um::winuser::{MB_ICONERROR, MB_OK};

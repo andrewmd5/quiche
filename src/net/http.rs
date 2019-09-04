@@ -15,9 +15,8 @@ struct DownloadProgress<R> {
 impl<R: Read> Read for DownloadProgress<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf).map(|n| {
-           
             let mut writer = self.progress.write().unwrap();
-             if !writer.started {
+            if !writer.started {
                 writer.started = true;
             }
             writer.current += n as u64;

@@ -6,11 +6,13 @@ mod io;
 mod net;
 mod os;
 mod ui;
+mod updater;
 
 use etc::constants::{is_compiled_for_64_bit, BootstrapError};
 use etc::rainway::{error_on_duplicate_session, is_installed};
 use os::windows::{get_system_info, needs_media_pack};
 use ui::messagebox::{show_error, show_error_with_url};
+use updater::{ActiveUpdate, UpdateState};
 
 use serde::Deserialize;
 
@@ -23,25 +25,10 @@ pub struct Progress {
     pub current: u64,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "PascalCase")]
-/// Release info is pulled from a remote JSON config [here](https://releases.rainway.com/Installer_current.json).
-/// The information located inside that config can be used to form a download URL.
-pub struct ReleaseInfo {
-    /// The prefix on our installer.
-    pub name: String,
-    /// The current release version.
-    pub version: String,
-    /// The SHA256 hash of the installer.
-    /// Used to validate if the file downloaded properly.
-    pub hash: String,
-}
-
-
 fn bridge<T: 'static>(webview: &mut WebView<'_, T>, arg: &str) -> WVResult {
     println!("INVOKED");
     match arg {
-        "download" => println!("cool")/*setup_rainway(webview, "test".to_string(), "error".to_string())*/,
+        "download" => println!("cool"), /*setup_rainway(webview, "test".to_string(), "error".to_string())*/
         "exit" => {
             //process::exit(0x0100);
         }
@@ -49,7 +36,6 @@ fn bridge<T: 'static>(webview: &mut WebView<'_, T>, arg: &str) -> WVResult {
     }
     Ok(())
 }
-
 
 fn main() -> Result<(), BootstrapError> {
     let caption = "Rainway Bootstrapper Error";
@@ -69,6 +55,8 @@ fn main() -> Result<(), BootstrapError> {
             return Err(e);
         }
     };
+
+    let mut update = ActiveUpdate::default();
     if !rainway_installed {
         match check_system_compatibility() {
             Ok(go) => go,
@@ -81,12 +69,26 @@ fn main() -> Result<(), BootstrapError> {
                 _ => {
                     show_error(caption, format!("{}", e));
                     sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
-                      return Err(e);
+                    return Err(e);
                 }
             },
         }
-        //TODO fetch latest release.
-        println!("System good!");
+    }
+    match updater::get_branch(updater::ReleaseBranch::Stable) {
+        Some(b) => update.branch = b,
+        None => {
+            let e = BootstrapError::ReleaseLookupFailed;
+            show_error(caption, format!("{}", e));
+            return Err(e);
+        }
+    }
+
+    //TODO use task based startup so I can invoke logic AFTER the window has been created.
+    //I'll need this to invoke some Javascript from the UI, set the DPI, etc.
+    if !rainway_installed {
+        //install
+    } else {
+        //update
     }
 
     let webview = web_view::builder()
@@ -123,7 +125,6 @@ fn check_system_compatibility() -> Result<(), BootstrapError> {
     }
     Ok(())
 }
-
 
 /*fn setup_rainway<T: 'static>(webview: &mut WebView<'_, T>, callback: String, error: String) {
     let handle = webview.handle();
