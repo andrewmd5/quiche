@@ -1,7 +1,17 @@
 [package]
-zip = "https://releases.rainway.com/2.0.0/package.zip" # The URL to the zip package containing all the new files.
-hash = "SHA256" # A hash of the zip package, used to verify it downloaded properly.
+# The URL to the zip package containing all the new files.
+zip = "https://releases.rainway.com/2.0.0/package.zip"
+# A hash of the zip package, used to verify it downloaded properly.
+hash = "SHA256"
+# All the files in the zip so we make sure they make it to their destination.
+files = [
+  "file1",
+  "file2"
+]
+
 
 [installer]
-url = "https://releases.rainway.com/2.0.0/installer.exe" # The URL of the actual full installer.
-hash = "SHA256" # The hash of the installer to verify it downloaded properly.
+# The URL of the actual full installer.
+url = "https://releases.rainway.com/2.0.0/installer.exe"
+# The hash of the installer to verify it downloaded properly.
+hash = "SHA256"
