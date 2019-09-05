@@ -91,7 +91,7 @@ fn main() -> Result<(), BootstrapError> {
             return Err(e);
         }
     }
-    if !rainway_installed {
+    if rainway_installed {
         match is_outdated(&update.branch.version) {
             Some(outdated) => {
                 if !outdated {
