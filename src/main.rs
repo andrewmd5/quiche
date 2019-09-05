@@ -9,10 +9,18 @@ mod ui;
 mod updater;
 
 use etc::constants::{is_compiled_for_64_bit, BootstrapError};
-use etc::rainway::{error_on_duplicate_session, is_installed};
+use etc::rainway::{error_on_duplicate_session, is_installed, is_outdated};
 use os::windows::{get_system_info, needs_media_pack};
+use ui::callback::run_async;
 use ui::messagebox::{show_error, show_error_with_url};
 use updater::{ActiveUpdate, UpdateState};
+use std::{
+    sync::{Arc, RwLock},
+    thread,
+    env,
+    time::Duration,
+};
+
 
 use serde::Deserialize;
 
@@ -28,7 +36,7 @@ pub struct Progress {
 fn bridge<T: 'static>(webview: &mut WebView<'_, T>, arg: &str) -> WVResult {
     println!("INVOKED");
     match arg {
-        "download" => println!("cool"), /*setup_rainway(webview, "test".to_string(), "error".to_string())*/
+        "download" =>  println!("no pls.") /*setup_rainway(webview, "test".to_string(), "error".to_string())*/,
         "exit" => {
             //process::exit(0x0100);
         }
@@ -74,6 +82,7 @@ fn main() -> Result<(), BootstrapError> {
             },
         }
     }
+    //regardless of whether we need to update or install, we need the latest branch.
     match updater::get_branch(updater::ReleaseBranch::Stable) {
         Some(b) => update.branch = b,
         None => {
@@ -82,14 +91,26 @@ fn main() -> Result<(), BootstrapError> {
             return Err(e);
         }
     }
-
-    //TODO use task based startup so I can invoke logic AFTER the window has been created.
-    //I'll need this to invoke some Javascript from the UI, set the DPI, etc.
     if !rainway_installed {
-        //install
-    } else {
-        //update
+        match is_outdated(&update.branch.version) {
+            Some(outdated) => {
+                if !outdated {
+                    println!("Shutting down because we're up-to-date.");
+                    println!("TODO check if Rainway is running or not, launch if not.");
+                    return Ok(());
+                }
+            }
+            None => {
+                println!("Shutting down because we failed to check if we are outdated.");
+                return Ok(());
+            }
+        }
     }
+    // if we're here, it means we need to update Rainway or install it.
+    // TODO kill all rainway processes at this point, if they exist. 
+    // TODO spawn the UI
+
+    
 
     let webview = web_view::builder()
         .title("Rainway Boostrapper")
@@ -97,7 +118,7 @@ fn main() -> Result<(), BootstrapError> {
         .size(800, 600)
         .resizable(false)
         .debug(false)
-        .user_data(0)
+        .user_data(update)
         .invoke_handler(bridge)
         .build()?;
 
@@ -128,14 +149,12 @@ fn check_system_compatibility() -> Result<(), BootstrapError> {
 
 /*fn setup_rainway<T: 'static>(webview: &mut WebView<'_, T>, callback: String, error: String) {
     let handle = webview.handle();
-    callback::run_async(
+    let user_data = webview.user_data_mut::<ActiveUpdate>();
+    run_async(
         webview,
         move || {
-            let arc = Arc::new(RwLock::new(Progress {
-                started: false,
-                len: 0,
-                current: 0,
-            }));
+           
+            let arc = Arc::new(RwLock::new(user_data));
             let local_arc = arc.clone();
             let child = thread::spawn(move || loop {
                 {
@@ -147,29 +166,16 @@ fn check_system_compatibility() -> Result<(), BootstrapError> {
                             webview.eval(
                                 format!(
                                     "updateTicks('Bytes to Download: {} -> Bytes Downloaded {}')",
-                                    f.len, f.current
+                                    f.total_bytes, f.downloaded_bytes
                                 )
                                 .as_str(),
                             )
                         })
                         .unwrap();
-                    if f.started && f.len == f.current {
-                        break;
-                    }
                 }
                 thread::sleep(Duration::from_millis(100));
             });
-            let release_info = download_json::<ReleaseInfo>(env!("RAINWAY_RELEASE_URL")).unwrap();
-            let install_url = format!(
-                env!("RAINWAY_DOWNLOAD_FORMAT"),
-                release_info.name, release_info.version
-            );
-            let mut download_path = env::temp_dir();
-            download_path.push(format!(
-                "{}_{}.exe",
-                release_info.name, release_info.version
-            ));
-            let fuck = download_file_r(local_arc, install_url.as_str(), &download_path).unwrap();
+            let fuck = download_file(local_arc, user_data.branch.manifest.unwrap().as_str(), &download_path).unwrap();
             let res = child.join();
             println!("test");
             get_system_info()

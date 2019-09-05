@@ -152,16 +152,15 @@ pub fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
 
             app.name = install_key
                 .get_value("DisplayName")
-                .unwrap_or(String::from(""));
+                .unwrap_or_default();
             app.install_location = install_key
-                .get_value("InstallLocation")
-                .unwrap_or(String::from(""));
+                .get_value("InstallLocation").unwrap_or_default();
             app.uninstall_string = install_key
                 .get_value("UninstallString")
-                .unwrap_or(String::from(""));
+                .unwrap_or_default();
             app.version = install_key
                 .get_value("DisplayVersion")
-                .unwrap_or(String::from(""));
+                .unwrap_or_default();
 
             if !app.name.is_empty()
                 && !app.install_location.is_empty()

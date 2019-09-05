@@ -3,6 +3,7 @@ use crate::os::windows::get_uninstallers;
 use std::path::Path;
 use std::process;
 use std::process::Command;
+use version_compare::{CompOp, Version, VersionCompare};
 
 /// Derives if Rainway is currently installed based on
 /// the list of installed applications for the current user.
@@ -13,8 +14,30 @@ pub fn is_installed() -> Result<bool, BootstrapError> {
 }
 
 /// TODO pull this from the registry
-pub fn get_version() -> String {
-    String::from("1.0.0")
+fn get_installed_version() -> Option<String> {
+    Some(String::from("1.0.0"))
+}
+
+pub fn is_outdated(remote_version: &String) -> Option<bool> {
+    let installed_version = get_installed_version().unwrap_or_default();
+    if let Some(latest_ver) = Version::from(&remote_version) {
+        if let Some(installed_ver) = Version::from(&installed_version) {
+            if installed_ver < latest_ver {
+                return Some(true);
+            } else {
+                return Some(false);
+            }
+        }
+    }
+    sentry::capture_message(
+        format!(
+            "{}",
+            BootstrapError::VersionCheckFailed(remote_version.to_string(), installed_version)
+        )
+        .as_str(),
+        sentry::Level::Error,
+    );
+    None
 }
 
 pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {

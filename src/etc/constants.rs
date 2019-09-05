@@ -1,4 +1,4 @@
-use crate::updater::{UpdateState, ReleaseBranch};
+use crate::updater::{ReleaseBranch, UpdateState, UpdateType};
 use std::fmt;
 
 #[derive(Debug)]
@@ -13,6 +13,7 @@ pub enum BootstrapError {
     RegistryValueNotFound(String),
     HttpFailed(u16, String),
     ReleaseLookupFailed,
+    VersionCheckFailed(String, String),
     TomlParseFailure,
     JsonParseFailure,
     BootstrapperExist,
@@ -37,6 +38,7 @@ impl fmt::Display for BootstrapError {
             BootstrapError::RegistryKeyNotFound(ref s) => write!(f, "An error occured accessing Windows Registry key: {}.", s),
             BootstrapError::RegistryValueNotFound(ref s) => write!(f, "An error occured accessing Windows Registry value: {}.", s),
             BootstrapError::HttpFailed(ref c, ref s) => write!(f, "Network connection issue occured accessing {}: {}.", s, c),
+            BootstrapError::VersionCheckFailed(ref rv, ref lv) => write!(f, "Unable to compare remote version ({}) to installed version ({}).", rv, lv),
             BootstrapError::TomlParseFailure => write!(f, "We're having trouble determining the current version of Rainway. Please exit and try again."),
             BootstrapError::JsonParseFailure => write!(f, "We're having trouble determining the current version of Rainway. Please exit and try again."),
             BootstrapError::SignatureMismatch => write!(f, "We were unable to validate the downloaded update. Please exit and try again."),
@@ -75,13 +77,26 @@ impl Default for UpdateState {
     }
 }
 
+impl Default for UpdateType {
+    fn default() -> UpdateType {
+        UpdateType::Install
+    }
+}
+
 impl fmt::Display for UpdateState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl fmt::Display for  ReleaseBranch {
+impl fmt::Display for UpdateType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+
+impl fmt::Display for ReleaseBranch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }

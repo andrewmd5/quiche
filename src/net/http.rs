@@ -1,5 +1,5 @@
 use crate::etc::constants::BootstrapError;
-use crate::Progress;
+use crate::updater::{ActiveUpdate, UpdateState};
 use reqwest::{header, Client};
 use serde::de::DeserializeOwned;
 use serde_json;
@@ -9,17 +9,17 @@ use std::path::PathBuf;
 
 struct DownloadProgress<R> {
     inner: R,
-    progress: std::sync::Arc<std::sync::RwLock<Progress>>,
+    progress: std::sync::Arc<std::sync::RwLock<ActiveUpdate>>,
 }
 
 impl<R: Read> Read for DownloadProgress<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf).map(|n| {
             let mut writer = self.progress.write().unwrap();
-            if !writer.started {
-                writer.started = true;
+            if writer.state == UpdateState::None {
+                writer.state = UpdateState::Downloading;
             }
-            writer.current += n as u64;
+            writer.downloaded_bytes += n as u64;
             drop(writer);
             n
         })
@@ -66,7 +66,7 @@ where
 
 /// Downloads a file from a remote URL and saves it to the output path supplied.
 pub fn download_file(
-    r: std::sync::Arc<std::sync::RwLock<Progress>>,
+    r: std::sync::Arc<std::sync::RwLock<ActiveUpdate>>,
     url: &str,
     path: &PathBuf,
 ) -> Result<bool, BootstrapError> {
@@ -94,7 +94,7 @@ pub fn download_file(
     let request = client.get(url);
 
     let mut writer = r.write().unwrap();
-    writer.len = total_size;
+    writer.total_bytes = total_size;
     drop(writer);
 
     let get_response = request.send()?;

@@ -4,6 +4,19 @@ use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 
+
+#[derive(Debug)]
+pub enum UpdateType {
+    /// An install requires us to run the full Rainway installer, 
+    /// becasuse Rainway itself is not installed.
+    Install,
+    /// A patch is applying new files to an existing installation.
+    /// You have a hammer. After five months, you replace the head. 
+    /// After five more months, you replace the handle. 
+    /// Is it still the same hammer?
+    Patch
+}
+
 #[derive(Debug)]
 pub enum ReleaseBranch {
     Stable,
@@ -12,7 +25,7 @@ pub enum ReleaseBranch {
 }
 
 /// The various states an update can be in.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum UpdateState {
     /// None means the update/installation has not started.
     None,
@@ -37,10 +50,11 @@ pub enum UpdateState {
 
 #[derive(Default)]
 pub struct ActiveUpdate {
+    pub update_type: UpdateType,
     pub state: UpdateState,
     pub total_bytes: u64,
     pub downloaded_bytes: u64,
-    pub branch: Branch
+    pub branch: Branch,
 }
 
 #[derive(Deserialize, Default)]
@@ -115,7 +129,7 @@ pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
         Ok(m) => Some(m),
         Err(e) => {
             sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
-            // This is an unrecoverable issue, so we return None 
+            // This is an unrecoverable issue, so we return None
             // and present a generic error message.
             return None;
         }
@@ -123,9 +137,7 @@ pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
     Some(releases.stable)
 }
 
-pub fn download_release() {
-
-}
+pub fn download_release() {}
 
 /// gets the latest Rainway 1.0 release. Used for installing Rainway.
 pub fn get_latest_release_legacy() -> Option<ReleaseInfo> {
