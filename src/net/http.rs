@@ -2,7 +2,6 @@ use crate::etc::constants::BootstrapError;
 use crate::updater::{UpdateDownloadProgress, UpdateState};
 use reqwest::{header, Client};
 use serde::de::DeserializeOwned;
-use serde_json;
 use std::fs::OpenOptions;
 use std::io::{self, copy, Read};
 use std::path::PathBuf;
@@ -45,25 +44,6 @@ where
     };
 }
 
-/// Downloads a remote JSON string and deseralizes it into a provided <T> generic.
-pub fn download_json<T>(url: &str) -> Result<T, BootstrapError>
-where
-    T: DeserializeOwned,
-{
-    let mut response = reqwest::get(url)?;
-    if !response.status().is_success() {
-        return Err(BootstrapError::HttpFailed(
-            response.status().as_u16(),
-            url.to_string(),
-        ));
-    }
-    let json = response.text()?;
-    match serde_json::from_str(&json) {
-        Err(_e) => return Err(BootstrapError::JsonParseFailure),
-        Ok(model) => return Ok(model),
-    };
-}
-
 /// Downloads a file from a remote URL and saves it to the output path supplied.
 pub fn download_file(
     r: std::sync::Arc<std::sync::RwLock<UpdateDownloadProgress>>,
@@ -73,7 +53,6 @@ pub fn download_file(
     let mut writer = r.write().unwrap();
     let client = Client::new();
     let head_response = client.head(url).send()?;
-    println!("{}", url);
     if !head_response.status().is_success() {
         writer.faulted = true;
         drop(writer);

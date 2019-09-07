@@ -1,10 +1,8 @@
 use crate::etc::constants::BootstrapError;
 use crate::io::hash::sha_256;
-use crate::net::http::{download_file, download_json, download_toml};
+use crate::net::http::{download_file, download_toml};
 use crate::ui::callback::run_async;
-use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::Path;
+use serde::{Deserialize};
 use std::{
     env,
     sync::{Arc, RwLock},
@@ -151,6 +149,7 @@ pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
     Some(releases.stable)
 }
 
+//TODO move UI stuff out of here. Make this method useable across versions (CLI vs. GUI)
 pub fn verify<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
     let remote_hash = match update.update_type {
         UpdateType::Install => update
@@ -196,6 +195,7 @@ pub fn verify<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
     );
 }
 
+//TODO move UI stuff out of here. Make this method useable across versions (CLI vs. GUI)
 pub fn download<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
     let url = match update.update_type {
         UpdateType::Install => update
@@ -266,12 +266,20 @@ pub fn download<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate)
     );
 }
 
-/// gets the latest Rainway 1.0 release. Used for installing Rainway.
-pub fn get_latest_release_legacy() -> Option<ReleaseInfo> {
-    if let Ok(info) = download_json::<ReleaseInfo>(env!("RAINWAY_RELEASE_URL")) {
-        return Some(info);
-    };
-    None
+/// TODO
+/// Backup the current installed version
+/// Stage (unzip) the new version to a seperate folder.
+/// Delete the currently installed version
+/// move the staged version into the install path
+/// Restore the backup if any steps fail. 
+pub fn apply_update(update: &ActiveUpdate, install_path: String) {
+
+}
+
+/// TODO
+/// Run the exe and wait for it to exit.
+pub fn run_installer(update: &ActiveUpdate) {
+
 }
 
 #[derive(Deserialize, Debug)]
