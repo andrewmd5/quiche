@@ -12,6 +12,6 @@ files = [
 
 [installer]
 # The URL of the actual full installer.
-url = "https://releases.rainway.com/2.0.0/installer.exe"
+url = "https://releases.rainway.com/Installer_1.0.17.0.exe"
 # The hash of the installer to verify it downloaded properly.
-hash = "SHA256"
+hash = "DFF3CCB82433E7C0DD917670062BCC20061F03ECCDDE87C7CB9DC4C2CC117586"

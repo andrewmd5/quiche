@@ -1,5 +1,5 @@
 use crate::etc::constants::BootstrapError;
-use crate::updater::{ActiveUpdate, UpdateState};
+use crate::updater::{UpdateDownloadProgress, UpdateState};
 use reqwest::{header, Client};
 use serde::de::DeserializeOwned;
 use serde_json;
@@ -9,17 +9,17 @@ use std::path::PathBuf;
 
 struct DownloadProgress<R> {
     inner: R,
-    progress: std::sync::Arc<std::sync::RwLock<ActiveUpdate>>,
+    progress: std::sync::Arc<std::sync::RwLock<UpdateDownloadProgress>>,
 }
 
 impl<R: Read> Read for DownloadProgress<R> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         self.inner.read(buf).map(|n| {
             let mut writer = self.progress.write().unwrap();
+            writer.downloaded_bytes += n as u64;
             if writer.state == UpdateState::None {
                 writer.state = UpdateState::Downloading;
             }
-            writer.downloaded_bytes += n as u64;
             drop(writer);
             n
         })
@@ -66,14 +66,18 @@ where
 
 /// Downloads a file from a remote URL and saves it to the output path supplied.
 pub fn download_file(
-    r: std::sync::Arc<std::sync::RwLock<ActiveUpdate>>,
+    r: std::sync::Arc<std::sync::RwLock<UpdateDownloadProgress>>,
     url: &str,
     path: &PathBuf,
 ) -> Result<bool, BootstrapError> {
+    let mut writer = r.write().unwrap();
     let client = Client::new();
     let head_response = client.head(url).send()?;
+    println!("{}", url);
     if !head_response.status().is_success() {
-        return Err(BootstrapError::InstallerDownloadFailed);
+        writer.faulted = true;
+        drop(writer);
+        return Err(BootstrapError::RemoteFileMissing);
     }
     let total_size = head_response
         .headers()
@@ -82,8 +86,12 @@ pub fn download_file(
         .and_then(|ct_len| ct_len.parse().ok())
         .unwrap_or(0);
     if total_size <= 0 {
-        return Err(BootstrapError::InstallerDownloadFailed);
+        writer.faulted = true;
+        drop(writer);
+        return Err(BootstrapError::RemoteFileMissing);
     }
+    writer.total_bytes = total_size;
+    drop(writer);
 
     let mut temp_file = OpenOptions::new()
         .read(true)
@@ -92,16 +100,12 @@ pub fn download_file(
         .open(path)?;
 
     let request = client.get(url);
-
-    let mut writer = r.write().unwrap();
-    writer.total_bytes = total_size;
-    drop(writer);
-
     let get_response = request.send()?;
     let mut source = DownloadProgress {
         progress: r,
         inner: get_response,
     };
+
     match copy(&mut source, &mut temp_file) {
         Err(e) => return Err(BootstrapError::IOError(e)),
         Ok(r) => return Ok(r == total_size),

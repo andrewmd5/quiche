@@ -150,17 +150,10 @@ pub fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
         if let Ok(install_key) = uninstall_key.open_subkey(key) {
             let mut app = InstalledApp::default();
 
-            app.name = install_key
-                .get_value("DisplayName")
-                .unwrap_or_default();
-            app.install_location = install_key
-                .get_value("InstallLocation").unwrap_or_default();
-            app.uninstall_string = install_key
-                .get_value("UninstallString")
-                .unwrap_or_default();
-            app.version = install_key
-                .get_value("DisplayVersion")
-                .unwrap_or_default();
+            app.name = install_key.get_value("DisplayName").unwrap_or_default();
+            app.install_location = install_key.get_value("InstallLocation").unwrap_or_default();
+            app.uninstall_string = install_key.get_value("UninstallString").unwrap_or_default();
+            app.version = install_key.get_value("DisplayVersion").unwrap_or_default();
 
             if !app.name.is_empty()
                 && !app.install_location.is_empty()

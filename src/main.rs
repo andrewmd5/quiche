@@ -11,18 +11,8 @@ mod updater;
 use etc::constants::{is_compiled_for_64_bit, BootstrapError};
 use etc::rainway::{error_on_duplicate_session, is_installed, is_outdated};
 use os::windows::{get_system_info, needs_media_pack};
-use ui::callback::run_async;
 use ui::messagebox::{show_error, show_error_with_url};
-use updater::{ActiveUpdate, UpdateState};
-use std::{
-    sync::{Arc, RwLock},
-    thread,
-    env,
-    time::Duration,
-};
-
-
-use serde::Deserialize;
+use updater::ActiveUpdate;
 
 use web_view::*;
 
@@ -31,18 +21,6 @@ pub struct Progress {
     pub started: bool,
     pub len: u64,
     pub current: u64,
-}
-
-fn bridge<T: 'static>(webview: &mut WebView<'_, T>, arg: &str) -> WVResult {
-    println!("INVOKED");
-    match arg {
-        "download" =>  println!("no pls.") /*setup_rainway(webview, "test".to_string(), "error".to_string())*/,
-        "exit" => {
-            //process::exit(0x0100);
-        }
-        _ => unimplemented!(),
-    }
-    Ok(())
 }
 
 fn main() -> Result<(), BootstrapError> {
@@ -65,6 +43,7 @@ fn main() -> Result<(), BootstrapError> {
     };
 
     let mut update = ActiveUpdate::default();
+
     if !rainway_installed {
         match check_system_compatibility() {
             Ok(go) => go,
@@ -91,6 +70,7 @@ fn main() -> Result<(), BootstrapError> {
             return Err(e);
         }
     }
+    //check if Rainway requires an update if it's installed
     if rainway_installed {
         match is_outdated(&update.branch.version) {
             Some(outdated) => {
@@ -106,11 +86,10 @@ fn main() -> Result<(), BootstrapError> {
             }
         }
     }
-    // if we're here, it means we need to update Rainway or install it.
-    // TODO kill all rainway processes at this point, if they exist. 
-    // TODO spawn the UI
 
-    
+    // if we're here, it means we need to update Rainway or install it.
+    // TODO kill all rainway processes at this point, if they exist.
+    // TODO spawn the UI
 
     let webview = web_view::builder()
         .title("Rainway Boostrapper")
@@ -118,12 +97,11 @@ fn main() -> Result<(), BootstrapError> {
         .size(800, 600)
         .resizable(false)
         .debug(false)
-        .user_data(update)
-        .invoke_handler(bridge)
+        .user_data(0)
+        .invoke_handler(|_webview, arg| handler(_webview, arg, &update))
         .build()?;
 
     webview.run()?;
-
     Ok(())
 }
 
@@ -147,45 +125,27 @@ fn check_system_compatibility() -> Result<(), BootstrapError> {
     Ok(())
 }
 
-/*fn setup_rainway<T: 'static>(webview: &mut WebView<'_, T>, callback: String, error: String) {
-    let handle = webview.handle();
-    let user_data = webview.user_data_mut::<ActiveUpdate>();
-    run_async(
-        webview,
-        move || {
-           
-            let arc = Arc::new(RwLock::new(user_data));
-            let local_arc = arc.clone();
-            let child = thread::spawn(move || loop {
-                {
-                    let my_rwlock = arc.clone();
-                    let reader = my_rwlock.read().unwrap();
-                    let f = *reader;
-                    handle
-                        .dispatch(move |webview| {
-                            webview.eval(
-                                format!(
-                                    "updateTicks('Bytes to Download: {} -> Bytes Downloaded {}')",
-                                    f.total_bytes, f.downloaded_bytes
-                                )
-                                .as_str(),
-                            )
-                        })
-                        .unwrap();
-                }
-                thread::sleep(Duration::from_millis(100));
-            });
-            let fuck = download_file(local_arc, user_data.branch.manifest.unwrap().as_str(), &download_path).unwrap();
-            let res = child.join();
-            println!("test");
-            get_system_info()
-                .map_err(|err| format!("{}", err))
-                .map(|output| format!("'{}'", "Done downloading!"))
-        },
-        callback,
-        error,
-    );
-}*/
+fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveUpdate) -> WVResult {
+    match arg {
+        "download" => {
+            updater::download(webview, update);
+        }
+        "verify" => {
+            updater::verify(webview, update);
+        }
+        "apply" => {
+            /*match update.update_type {
+                UpdateType::Install =>  updater::run_installer(),
+                UpdateType::Patch =>  updater::apply_patch()
+            }*/
+        }
+        "exit" => {
+            //process::exit(0x0100);
+        }
+        _ => unimplemented!(),
+    }
+    Ok(())
+}
 
 const HTML: &str = r#"
 <!doctype html>
@@ -195,6 +155,26 @@ const HTML: &str = r#"
 		<button onclick="external.invoke('download')">download</button>
 		<button onclick="external.invoke('exit')">exit</button>
 		<script type="text/javascript">
+            function downloadProgress(v, total, downloaded) {
+				document.getElementById('ticks').innerHTML = 'Download Progress for Rainway ' + v + '</br> Total Bytes: ' + total + '</br> Downloaded Bytes: ' + downloaded;
+			}
+            function downloadFailed(e) {
+				document.getElementById('ticks').innerHTML = 'Download failed! ' + e;
+			}
+            function downloadComplete(e) {
+				document.getElementById('ticks').innerHTML = 'Download Done! Verifying the update... ' + e;
+                external.invoke('verify')
+			}
+
+
+            function verificationComplete(e) {
+				document.getElementById('ticks').innerHTML = 'Verified the update!';
+			}
+
+            function verificationFailed(e) {
+				document.getElementById('ticks').innerHTML = e;
+			}
+            
 			function updateTicks(n) {
 				document.getElementById('ticks').innerHTML = 'ticks ' + n;
 			}

@@ -1,20 +1,28 @@
+use crate::etc::constants::BootstrapError;
 use crate::io::hash::sha_256;
-use crate::net::http::{download_json, download_toml};
-use serde::Deserialize;
+use crate::net::http::{download_file, download_json, download_toml};
+use crate::ui::callback::run_async;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-
+use std::{
+    env,
+    sync::{Arc, RwLock},
+    thread,
+    time::Duration,
+};
+use web_view::WebView;
 
 #[derive(Debug)]
 pub enum UpdateType {
-    /// An install requires us to run the full Rainway installer, 
+    /// An install requires us to run the full Rainway installer,
     /// becasuse Rainway itself is not installed.
     Install,
     /// A patch is applying new files to an existing installation.
-    /// You have a hammer. After five months, you replace the head. 
-    /// After five more months, you replace the handle. 
+    /// You have a hammer. After five months, you replace the head.
+    /// After five more months, you replace the handle.
     /// Is it still the same hammer?
-    Patch
+    Patch,
 }
 
 #[derive(Debug)]
@@ -52,9 +60,15 @@ pub enum UpdateState {
 pub struct ActiveUpdate {
     pub update_type: UpdateType,
     pub state: UpdateState,
+    pub branch: Branch,
+}
+
+#[derive(Default, Copy, Clone)]
+pub struct UpdateDownloadProgress {
+    pub state: UpdateState,
     pub total_bytes: u64,
     pub downloaded_bytes: u64,
-    pub branch: Branch,
+    pub faulted: bool,
 }
 
 #[derive(Deserialize, Default)]
@@ -137,7 +151,120 @@ pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
     Some(releases.stable)
 }
 
-pub fn download_release() {}
+pub fn verify<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
+    let remote_hash = match update.update_type {
+        UpdateType::Install => update
+            .clone()
+            .branch
+            .manifest
+            .as_ref()
+            .unwrap()
+            .installer
+            .hash
+            .as_str(),
+        UpdateType::Patch => update
+            .branch
+            .manifest
+            .as_ref()
+            .unwrap()
+            .package
+            .hash
+            .as_str(),
+    }
+    .to_string();
+    let version = update.branch.version.clone();
+    let verification_complete = "verificationComplete";
+    let error_callback = "verificationFailed";
+    let mut download_path = env::temp_dir();
+    download_path.push(format!("{}_{}.rwup", "Rainway", version));
+    run_async(
+        webview,
+        move || {
+            let result: Result<String, String> = Ok(String::default());
+            let err: Result<String, String> = Err(BootstrapError::SignatureMismatch.to_string());
+            if let Some(local_hash) = sha_256(&download_path) {
+                match local_hash == remote_hash {
+                    true => return result,
+                    false => return err,
+                }
+            } else {
+                return err;
+            }
+        },
+        verification_complete.to_string(),
+        error_callback.to_string(),
+    );
+}
+
+pub fn download<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
+    let url = match update.update_type {
+        UpdateType::Install => update
+            .branch
+            .manifest
+            .as_ref()
+            .unwrap()
+            .installer
+            .url
+            .as_str(),
+        UpdateType::Patch => update
+            .branch
+            .manifest
+            .as_ref()
+            .unwrap()
+            .package
+            .url
+            .as_str(),
+    }
+    .to_string();
+    let version = update.branch.version.clone();
+    let download_complete = "downloadComplete";
+    let error_callback = "downloadFailed";
+    let download_progress = UpdateDownloadProgress::default();
+    let handle = webview.handle();
+    let arc = Arc::new(RwLock::new(download_progress));
+    let local_arc = arc.clone();
+    let local_version = update.branch.version.clone();
+    run_async(
+        webview,
+        move || {
+            let child = thread::spawn(move || loop {
+                {
+                    let reader_lock = arc.clone();
+                    let reader = reader_lock.read().unwrap();
+                    if reader.faulted {
+                        drop(reader);
+                        break;
+                    }
+                    if reader.state == UpdateState::Downloading
+                        && reader.total_bytes == reader.downloaded_bytes
+                    {
+                        drop(reader);
+                        break;
+                    }
+                    let data = format!(
+                        "downloadProgress('{}', '{}', '{}')",
+                        local_version, reader.total_bytes, reader.downloaded_bytes
+                    );
+                    drop(reader);
+                    handle
+                        .dispatch(move |webview| webview.eval(&data.to_string()))
+                        .unwrap();
+                }
+                thread::sleep(Duration::from_millis(100));
+            });
+            let mut download_path = env::temp_dir();
+            download_path.push(format!("{}_{}.rwup", "Rainway", version));
+
+            let results = download_file(local_arc, &url, &download_path)
+                .map_err(|err| format!("{}", err))
+                .map(|output| format!("'{}'", output));
+            let _res = child.join();
+            results
+        },
+        download_complete.to_string(),
+        error_callback.to_string(),
+    );
+}
 
 /// gets the latest Rainway 1.0 release. Used for installing Rainway.
 pub fn get_latest_release_legacy() -> Option<ReleaseInfo> {

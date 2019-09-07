@@ -18,7 +18,7 @@ pub enum BootstrapError {
     JsonParseFailure,
     BootstrapperExist,
     SignatureMismatch,
-    InstallerDownloadFailed,
+    RemoteFileMissing,
     InstallationFailed(String),
     RequestError(reqwest::Error),
     IOError(std::io::Error),
@@ -41,8 +41,8 @@ impl fmt::Display for BootstrapError {
             BootstrapError::VersionCheckFailed(ref rv, ref lv) => write!(f, "Unable to compare remote version ({}) to installed version ({}).", rv, lv),
             BootstrapError::TomlParseFailure => write!(f, "We're having trouble determining the current version of Rainway. Please exit and try again."),
             BootstrapError::JsonParseFailure => write!(f, "We're having trouble determining the current version of Rainway. Please exit and try again."),
-            BootstrapError::SignatureMismatch => write!(f, "We were unable to validate the downloaded update. Please exit and try again."),
-            BootstrapError::InstallerDownloadFailed => write!(f, "We were unable to downloaded the latest Rainway update. Please exit and try again."),
+            BootstrapError::SignatureMismatch => write!(f, "We were unable to validate the updates integrity. Please exit and try again."),
+            BootstrapError::RemoteFileMissing => write!(f, "We were unable to downloaded the latest Rainway update. Please exit and try again."),
             BootstrapError::InstallationFailed(ref s) => write!(f, "An error occured installing the latest update: {0}", s),
             BootstrapError::RequestError(ref e) => write!(f, "An unknown network issue was encountered: {0}", e),
             BootstrapError::IOError(ref e) => write!(f, "An unknown issue was encountered: {0}", e),
@@ -95,6 +95,13 @@ impl fmt::Display for UpdateType {
     }
 }
 
+impl Copy for UpdateState {}
+
+impl Clone for UpdateState {
+    fn clone(&self) -> UpdateState {
+        *self
+    }
+}
 
 impl fmt::Display for ReleaseBranch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
