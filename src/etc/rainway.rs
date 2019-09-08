@@ -1,6 +1,5 @@
 use crate::etc::constants::BootstrapError;
 use crate::os::windows::get_uninstallers;
-use std::path::Path;
 use std::process;
 use std::process::Command;
 use version_compare::{CompOp, Version, VersionCompare};
@@ -16,6 +15,13 @@ pub fn is_installed() -> Result<bool, BootstrapError> {
 /// TODO pull this from the registry
 fn get_installed_version() -> Option<String> {
     Some(String::from("1.0.0"))
+}
+
+/// TODO pull this from the registry
+/// THIS NEEDS A TRAILING SLASH
+pub fn get_install_path() -> Option<String> {
+    let registry_path = String::from("E:\\UpdateTest\\InstalledFolder\\");
+    Some(registry_path)
 }
 
 pub fn is_outdated(remote_version: &String) -> Option<bool> {

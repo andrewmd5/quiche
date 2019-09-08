@@ -139,7 +139,7 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
             apply_update(webview, update);
         }
         "exit" => {
-           std::process::exit(0);
+            std::process::exit(0);
         }
         _ => unimplemented!(),
     }

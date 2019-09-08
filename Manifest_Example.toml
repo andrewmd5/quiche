@@ -1,12 +1,22 @@
 [package]
 # The URL to the zip package containing all the new files.
-url = "https://releases.rainway.com/2.0.0/package.zip"
+url = "http://local.vg:8080/2.0.0/package.zip"
 # A hash of the zip package, used to verify it downloaded properly.
-hash = "SHA256"
+hash = "98FE972A3F9B84D336F6DA80FE9712D0073CC6E274E54F4AED3229E8FC1FCFB0"
 # All the files in the zip so we make sure they make it to their destination.
 files = [
-  "file1",
-  "file2"
+"brightmaps.pk3",
+"doom.wad",
+"gzdoom-Andrew.ini",
+"gzdoom.exe",
+"gzdoom.pk3",
+"libfluidsynth64.dll",
+"libmpg123-0.dll",
+"libsndfile-1.dll",
+"licenses.zip",
+"lights.pk3",
+"openal32.dll",
+"zd_extra.pk3"
 ]
 
 

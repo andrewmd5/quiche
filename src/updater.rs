@@ -1,8 +1,13 @@
 use crate::etc::constants::BootstrapError;
+use crate::etc::rainway::get_install_path;
+use crate::io::disk::{delete_dir_contents, dir_contains_all_files};
 use crate::io::hash::sha_256;
+use crate::io::zip::unzip;
 use crate::net::http::{download_file, download_toml};
-use crate::ui::callback::run_async;
+use fs_extra::dir::*;
 use serde::Deserialize;
+use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 use std::{
     env,
@@ -10,7 +15,6 @@ use std::{
     thread,
     time::Duration,
 };
-use web_view::WebView;
 
 #[derive(Debug)]
 pub enum UpdateType {
@@ -64,6 +68,9 @@ pub struct ActiveUpdate {
 }
 
 impl ActiveUpdate {
+    pub fn get_package_files(&self) -> Vec<String> {
+        self.branch.manifest.as_ref().unwrap().package.files.clone()
+    }
     pub fn get_temp_name(&self) -> String {
         self.temp_name.clone()
     }
@@ -255,11 +262,55 @@ where
 /// Delete the currently installed version
 /// move the staged version into the install path
 /// Restore the backup if any steps fail.
-pub fn apply(package_name: String, install_path: String) {}
+pub fn apply(
+    package_name: String,
+    version: String,
+    package_files: Vec<String>,
+) -> Result<String, String> {
+    let mut download_path = env::temp_dir();
+    download_path.push(package_name);
+    // TODO error handling here
+    let install_path = get_install_path().unwrap_or_default();
 
+    let mut update_staging_path = env::temp_dir();
+    update_staging_path.push(format!("Rainway_Stage_{}", &version));
+    if update_staging_path.exists() {
+        fs::remove_dir_all(&update_staging_path).unwrap();
+    }
 
-/// Runs the full installer and waits for it to exit. 
-/// The bootstrapper will not launch Rainway after this. 
+    //TODO break out some of these into their on io fns
+    let mut backup_path = env::temp_dir();
+    backup_path.push(format!("Rainway_Backup_{}", &version));
+    if backup_path.exists() {
+        fs::remove_dir_all(&backup_path).unwrap();
+    }
+    let mut options = CopyOptions::new();
+    options.copy_inside = true;
+    options.content_only = true;
+    options.overwrite = true;
+    //make the backup
+    copy(&install_path, &backup_path, &options).unwrap();
+    //stage the update
+    unzip(&download_path, &update_staging_path);
+
+    //delete the install without deleting the root folder.
+    let demo_dir = fs::read_dir(&install_path);
+    delete_dir_contents(demo_dir, vec!["pick.txt".to_string()]);
+    // TODO check if all files present
+    // move update to install path
+    //  println!("{}", &update_staging_path.display());
+
+    move_dir(&update_staging_path, &install_path, &options).unwrap();
+    dir_contains_all_files(package_files, &install_path);
+
+    //TODO all the error handling
+    //TODO start rainway
+
+    Ok(String::default())
+}
+
+/// Runs the full installer and waits for it to exit.
+/// The bootstrapper will not launch Rainway after this.
 /// The installer should be configured to launch post-install.
 pub fn install(installer_name: String) -> Result<String, String> {
     let mut download_path = env::temp_dir();
@@ -269,19 +320,4 @@ pub fn install(installer_name: String) -> Result<String, String> {
         .output()
         .map_err(|err| format!("{}", BootstrapError::InstallationFailed(err.to_string())))
         .map(|output| format!("'{}'", output.status.success()))
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "PascalCase")]
-/// DEPRECATED
-/// Release info is pulled from a remote JSON config [here](https://releases.rainway.com/Installer_current.json).
-/// The information located inside that config can be used to form a download URL.
-pub struct ReleaseInfo {
-    /// The prefix on our installer.
-    pub name: String,
-    /// The current release version.
-    pub version: String,
-    /// The SHA256 hash of the installer.
-    /// Used to validate if the file downloaded properly.
-    pub hash: String,
 }

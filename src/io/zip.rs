@@ -2,7 +2,7 @@ use std::fs::{create_dir_all, File};
 use std::io;
 use std::path::PathBuf;
 
-pub fn unzip(input: PathBuf, output: PathBuf) -> bool {
+pub fn unzip(input: &PathBuf, output: &PathBuf) -> bool {
     let input_file = match File::open(&input) {
         Ok(f) => f,
         Err(_e) => return false,
@@ -16,7 +16,8 @@ pub fn unzip(input: PathBuf, output: PathBuf) -> bool {
             Ok(f) => f,
             Err(_e) => return false,
         };
-        let outpath = file.sanitized_name();
+        let mut outpath = output.clone();
+        outpath.push(file.sanitized_name());
         if (&*file.name()).ends_with('/') {
             println!(
                 "File {} extracted to \"{}\"",
