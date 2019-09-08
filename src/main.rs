@@ -12,7 +12,7 @@ use etc::constants::{is_compiled_for_64_bit, BootstrapError};
 use etc::rainway::{error_on_duplicate_session, is_installed, is_outdated};
 use os::windows::{get_system_info, needs_media_pack};
 use ui::messagebox::{show_error, show_error_with_url};
-use ui::view::{download_update, verify_update};
+use ui::view::{apply_update, download_update, verify_update};
 use updater::{ActiveUpdate, UpdateType};
 
 use web_view::*;
@@ -136,13 +136,10 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
             verify_update(webview, update);
         }
         "apply" => {
-            /*match update.update_type {
-                UpdateType::Install =>  updater::run_installer(),
-                UpdateType::Patch =>  updater::apply_patch()
-            }*/
+            apply_update(webview, update);
         }
         "exit" => {
-            println!("Hello World!");
+           std::process::exit(0);
         }
         _ => unimplemented!(),
     }
@@ -170,10 +167,23 @@ const HTML: &str = r#"
 
 
             function verificationComplete(e) {
-				document.getElementById('ticks').innerHTML = 'Verified the update!';
+				document.getElementById('ticks').innerHTML = 'Verified the update! Installing...';
+                 external.invoke('apply')
+
+			}
+            function verificationFailed(e) {
+				document.getElementById('ticks').innerHTML = e;
 			}
 
-            function verificationFailed(e) {
+            function updateComplete(e) {
+				document.getElementById('ticks').innerHTML = 'Rainway Installed/Updated! Closing...';
+                setTimeout(
+    function() {
+      external.invoke('exit')
+    }, 2500);
+
+			}
+            function updateFailed(e) {
 				document.getElementById('ticks').innerHTML = e;
 			}
             

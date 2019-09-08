@@ -94,6 +94,13 @@ impl fmt::Display for UpdateType {
         write!(f, "{:?}", self)
     }
 }
+impl Copy for UpdateType {}
+
+impl Clone for UpdateType {
+    fn clone(&self) -> UpdateType {
+        *self
+    }
+}
 
 impl Copy for UpdateState {}
 

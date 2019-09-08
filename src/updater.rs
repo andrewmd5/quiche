@@ -3,6 +3,7 @@ use crate::io::hash::sha_256;
 use crate::net::http::{download_file, download_toml};
 use crate::ui::callback::run_async;
 use serde::Deserialize;
+use std::process::Command;
 use std::{
     env,
     sync::{Arc, RwLock},
@@ -59,7 +60,7 @@ pub struct ActiveUpdate {
     pub update_type: UpdateType,
     pub state: UpdateState,
     pub branch: Branch,
-    pub temp_name: String
+    pub temp_name: String,
 }
 
 impl ActiveUpdate {
@@ -73,7 +74,8 @@ impl ActiveUpdate {
         match self.update_type {
             UpdateType::Install => ".exe",
             UpdateType::Patch => "zip",
-        }.to_string()
+        }
+        .to_string()
     }
     pub fn get_url(&self) -> String {
         match self.update_type {
@@ -193,9 +195,9 @@ pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
     Some(releases.stable)
 }
 
-pub fn verify(remote_hash: String, version: String) -> Result<String, String> {
+pub fn verify(remote_hash: String, input_file: String) -> Result<String, String> {
     let mut download_path = env::temp_dir();
-    download_path.push(format!("{}_{}.rwup", "Rainway", version));
+    download_path.push(input_file);
     let result: Result<String, String> = Ok(String::default());
     let err: Result<String, String> = Err(BootstrapError::SignatureMismatch.to_string());
     if let Some(local_hash) = sha_256(&download_path) {
@@ -240,7 +242,6 @@ where
     });
     let mut download_path = env::temp_dir();
     download_path.push(output_file);
-    println!("Downloading {}", download_path.display());
     let results = download_file(local_arc, &url, &download_path)
         .map_err(|err| format!("{}", err))
         .map(|output| format!("'{}'", output));
@@ -254,11 +255,21 @@ where
 /// Delete the currently installed version
 /// move the staged version into the install path
 /// Restore the backup if any steps fail.
-pub fn apply_update(update: &ActiveUpdate, install_path: String) {}
+pub fn apply(package_name: String, install_path: String) {}
 
-/// TODO
-/// Run the exe and wait for it to exit.
-pub fn run_installer(update: &ActiveUpdate) {}
+
+/// Runs the full installer and waits for it to exit. 
+/// The bootstrapper will not launch Rainway after this. 
+/// The installer should be configured to launch post-install.
+pub fn install(installer_name: String) -> Result<String, String> {
+    let mut download_path = env::temp_dir();
+    download_path.push(installer_name);
+    Command::new(download_path)
+        .args(&[""])
+        .output()
+        .map_err(|err| format!("{}", BootstrapError::InstallationFailed(err.to_string())))
+        .map(|output| format!("'{}'", output.status.success()))
+}
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]

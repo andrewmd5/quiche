@@ -51,12 +51,3 @@ pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
     }
     Ok(())
 }
-
-/// Runs the downloaded Rainway installer and waits for it to complete.
-pub fn run_intaller(path: &Path) -> Result<bool, BootstrapError> {
-    let installer = match Command::new(path).args(&[""]).output() {
-        Err(e) => return Err(BootstrapError::InstallationFailed(e.to_string())),
-        Ok(o) => o,
-    };
-    Ok(installer.status.success())
-}
