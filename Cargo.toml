@@ -21,6 +21,7 @@ LegalCopyright = "Copyright © 2019"
 winres = "0.1"
 
 [dependencies]
+zip = "0.5"
 fs_extra = "1.1.0"
 version-compare = "0.0.9"
 threadpool = "1.0"

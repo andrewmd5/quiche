@@ -2,7 +2,7 @@ use crate::etc::constants::BootstrapError;
 use crate::io::hash::sha_256;
 use crate::net::http::{download_file, download_toml};
 use crate::ui::callback::run_async;
-use serde::{Deserialize};
+use serde::Deserialize;
 use std::{
     env,
     sync::{Arc, RwLock},
@@ -59,6 +59,40 @@ pub struct ActiveUpdate {
     pub update_type: UpdateType,
     pub state: UpdateState,
     pub branch: Branch,
+}
+
+impl ActiveUpdate {
+    pub fn get_version(&self) -> String {
+        self.branch.version.clone()
+    }
+    pub fn get_url(&self) -> String {
+        match self.update_type {
+            UpdateType::Install => self
+                .branch
+                .manifest
+                .as_ref()
+                .unwrap()
+                .installer
+                .url
+                .as_str(),
+            UpdateType::Patch => self.branch.manifest.as_ref().unwrap().package.url.as_str(),
+        }
+        .to_string()
+    }
+    pub fn get_hash(&self) -> String {
+        match self.update_type {
+            UpdateType::Install => self
+                .branch
+                .manifest
+                .as_ref()
+                .unwrap()
+                .installer
+                .hash
+                .as_str(),
+            UpdateType::Patch => self.branch.manifest.as_ref().unwrap().package.hash.as_str(),
+        }
+        .to_string()
+    }
 }
 
 #[derive(Default, Copy, Clone)]
@@ -151,27 +185,8 @@ pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
 
 //TODO move UI stuff out of here. Make this method useable across versions (CLI vs. GUI)
 pub fn verify<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
-    let remote_hash = match update.update_type {
-        UpdateType::Install => update
-            .clone()
-            .branch
-            .manifest
-            .as_ref()
-            .unwrap()
-            .installer
-            .hash
-            .as_str(),
-        UpdateType::Patch => update
-            .branch
-            .manifest
-            .as_ref()
-            .unwrap()
-            .package
-            .hash
-            .as_str(),
-    }
-    .to_string();
-    let version = update.branch.version.clone();
+    let remote_hash = update.get_hash();
+    let version = update.get_version();
     let verification_complete = "verificationComplete";
     let error_callback = "verificationFailed";
     let mut download_path = env::temp_dir();
@@ -195,75 +210,44 @@ pub fn verify<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
     );
 }
 
-//TODO move UI stuff out of here. Make this method useable across versions (CLI vs. GUI)
-pub fn download<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
-    let url = match update.update_type {
-        UpdateType::Install => update
-            .branch
-            .manifest
-            .as_ref()
-            .unwrap()
-            .installer
-            .url
-            .as_str(),
-        UpdateType::Patch => update
-            .branch
-            .manifest
-            .as_ref()
-            .unwrap()
-            .package
-            .url
-            .as_str(),
-    }
-    .to_string();
-    let version = update.branch.version.clone();
-    let download_complete = "downloadComplete";
-    let error_callback = "downloadFailed";
+pub fn download_callback<F>(url: String, version: String, callback: F) -> Result<String, String>
+where
+    F: Fn(String, u64, u64) + Send + Sync + 'static,
+{
     let download_progress = UpdateDownloadProgress::default();
-    let handle = webview.handle();
     let arc = Arc::new(RwLock::new(download_progress));
     let local_arc = arc.clone();
-    let local_version = update.branch.version.clone();
-    run_async(
-        webview,
-        move || {
-            let child = thread::spawn(move || loop {
-                {
-                    let reader_lock = arc.clone();
-                    let reader = reader_lock.read().unwrap();
-                    if reader.faulted {
-                        drop(reader);
-                        break;
-                    }
-                    if reader.state == UpdateState::Downloading
-                        && reader.total_bytes == reader.downloaded_bytes
-                    {
-                        drop(reader);
-                        break;
-                    }
-                    let data = format!(
-                        "downloadProgress('{}', '{}', '{}')",
-                        local_version, reader.total_bytes, reader.downloaded_bytes
-                    );
-                    drop(reader);
-                    handle
-                        .dispatch(move |webview| webview.eval(&data.to_string()))
-                        .unwrap();
-                }
-                thread::sleep(Duration::from_millis(100));
-            });
-            let mut download_path = env::temp_dir();
-            download_path.push(format!("{}_{}.rwup", "Rainway", version));
-
-            let results = download_file(local_arc, &url, &download_path)
-                .map_err(|err| format!("{}", err))
-                .map(|output| format!("'{}'", output));
-            let _res = child.join();
-            results
-        },
-        download_complete.to_string(),
-        error_callback.to_string(),
-    );
+    let local_version = version.clone();
+    let child = thread::spawn(move || loop {
+        {
+            let reader_lock = arc.clone();
+            let reader = reader_lock.read().unwrap();
+            if reader.faulted {
+                drop(reader);
+                break;
+            }
+            if reader.state == UpdateState::Downloading
+                && reader.total_bytes == reader.downloaded_bytes
+            {
+                drop(reader);
+                break;
+            }
+            callback(
+                local_version.clone(),
+                reader.total_bytes,
+                reader.downloaded_bytes,
+            );
+            drop(reader);
+        }
+        thread::sleep(Duration::from_millis(100));
+    });
+    let mut download_path = env::temp_dir();
+    download_path.push(format!("{}_{}.rwup", "Rainway", version));
+    let results = download_file(local_arc, &url, &download_path)
+        .map_err(|err| format!("{}", err))
+        .map(|output| format!("'{}'", output));
+    let _res = child.join();
+    results
 }
 
 /// TODO
@@ -271,16 +255,12 @@ pub fn download<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate)
 /// Stage (unzip) the new version to a seperate folder.
 /// Delete the currently installed version
 /// move the staged version into the install path
-/// Restore the backup if any steps fail. 
-pub fn apply_update(update: &ActiveUpdate, install_path: String) {
-
-}
+/// Restore the backup if any steps fail.
+pub fn apply_update(update: &ActiveUpdate, install_path: String) {}
 
 /// TODO
 /// Run the exe and wait for it to exit.
-pub fn run_installer(update: &ActiveUpdate) {
-
-}
+pub fn run_installer(update: &ActiveUpdate) {}
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
