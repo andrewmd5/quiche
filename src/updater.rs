@@ -59,11 +59,21 @@ pub struct ActiveUpdate {
     pub update_type: UpdateType,
     pub state: UpdateState,
     pub branch: Branch,
+    pub temp_name: String
 }
 
 impl ActiveUpdate {
+    pub fn get_temp_name(&self) -> String {
+        self.temp_name.clone()
+    }
     pub fn get_version(&self) -> String {
         self.branch.version.clone()
+    }
+    pub fn get_ext(&self) -> String {
+        match self.update_type {
+            UpdateType::Install => ".exe",
+            UpdateType::Patch => "zip",
+        }.to_string()
     }
     pub fn get_url(&self) -> String {
         match self.update_type {
@@ -183,41 +193,32 @@ pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
     Some(releases.stable)
 }
 
-//TODO move UI stuff out of here. Make this method useable across versions (CLI vs. GUI)
-pub fn verify<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
-    let remote_hash = update.get_hash();
-    let version = update.get_version();
-    let verification_complete = "verificationComplete";
-    let error_callback = "verificationFailed";
+pub fn verify(remote_hash: String, version: String) -> Result<String, String> {
     let mut download_path = env::temp_dir();
     download_path.push(format!("{}_{}.rwup", "Rainway", version));
-    run_async(
-        webview,
-        move || {
-            let result: Result<String, String> = Ok(String::default());
-            let err: Result<String, String> = Err(BootstrapError::SignatureMismatch.to_string());
-            if let Some(local_hash) = sha_256(&download_path) {
-                match local_hash == remote_hash {
-                    true => return result,
-                    false => return err,
-                }
-            } else {
-                return err;
-            }
-        },
-        verification_complete.to_string(),
-        error_callback.to_string(),
-    );
+    let result: Result<String, String> = Ok(String::default());
+    let err: Result<String, String> = Err(BootstrapError::SignatureMismatch.to_string());
+    if let Some(local_hash) = sha_256(&download_path) {
+        match local_hash == remote_hash {
+            true => return result,
+            false => return err,
+        }
+    } else {
+        return err;
+    }
 }
 
-pub fn download_callback<F>(url: String, version: String, callback: F) -> Result<String, String>
+pub fn download_with_callback<F>(
+    url: String,
+    output_file: String,
+    callback: F,
+) -> Result<String, String>
 where
-    F: Fn(String, u64, u64) + Send + Sync + 'static,
+    F: Fn(u64, u64) + Send + Sync + 'static,
 {
     let download_progress = UpdateDownloadProgress::default();
     let arc = Arc::new(RwLock::new(download_progress));
     let local_arc = arc.clone();
-    let local_version = version.clone();
     let child = thread::spawn(move || loop {
         {
             let reader_lock = arc.clone();
@@ -232,17 +233,14 @@ where
                 drop(reader);
                 break;
             }
-            callback(
-                local_version.clone(),
-                reader.total_bytes,
-                reader.downloaded_bytes,
-            );
+            callback(reader.total_bytes, reader.downloaded_bytes);
             drop(reader);
         }
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(16));
     });
     let mut download_path = env::temp_dir();
-    download_path.push(format!("{}_{}.rwup", "Rainway", version));
+    download_path.push(output_file);
+    println!("Downloading {}", download_path.display());
     let results = download_file(local_arc, &url, &download_path)
         .map_err(|err| format!("{}", err))
         .map(|output| format!("'{}'", output));

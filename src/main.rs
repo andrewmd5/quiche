@@ -11,13 +11,11 @@ mod updater;
 use etc::constants::{is_compiled_for_64_bit, BootstrapError};
 use etc::rainway::{error_on_duplicate_session, is_installed, is_outdated};
 use os::windows::{get_system_info, needs_media_pack};
-use ui::view::download;
 use ui::messagebox::{show_error, show_error_with_url};
+use ui::view::{download_update, verify_update};
 use updater::{ActiveUpdate, UpdateType};
 
-
 use web_view::*;
-
 
 fn main() -> Result<(), BootstrapError> {
     let caption = "Rainway Bootstrapper Error";
@@ -71,6 +69,7 @@ fn main() -> Result<(), BootstrapError> {
             return Err(e);
         }
     }
+    update.temp_name = format!("{}{}", update.get_hash(), update.get_ext());
     //check if Rainway requires an update if it's installed
     if rainway_installed {
         match is_outdated(&update.branch.version) {
@@ -88,7 +87,7 @@ fn main() -> Result<(), BootstrapError> {
         }
     }
 
-   // println!("{}", update.branch.manifest.unwrap().package.url);;
+    // println!("{}", update.branch.manifest.unwrap().package.url);;
 
     // if we're here, it means we need to update Rainway or install it.
     // TODO kill all rainway processes at this point, if they exist.
@@ -131,10 +130,10 @@ fn check_system_compatibility() -> Result<(), BootstrapError> {
 fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveUpdate) -> WVResult {
     match arg {
         "download" => {
-            download(webview, update);
+            download_update(webview, update);
         }
         "verify" => {
-            updater::verify(webview, update);
+            verify_update(webview, update);
         }
         "apply" => {
             /*match update.update_type {
@@ -143,7 +142,7 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
             }*/
         }
         "exit" => {
-            //process::exit(0x0100);
+            println!("Hello World!");
         }
         _ => unimplemented!(),
     }
