@@ -1,7 +1,7 @@
 use crate::etc::constants::BootstrapError;
 use crate::os::windows::get_uninstallers;
 use std::process;
-use std::process::Command;
+
 use version_compare::{CompOp, Version, VersionCompare};
 
 /// Derives if Rainway is currently installed based on
