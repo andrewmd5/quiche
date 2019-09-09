@@ -257,11 +257,8 @@ where
 }
 
 /// TODO
-/// Backup the current installed version
-/// Stage (unzip) the new version to a seperate folder.
-/// Delete the currently installed version
-/// move the staged version into the install path
-/// Restore the backup if any steps fail.
+/// Rolling back if any steps fail.
+/// Checking for failures. 
 pub fn apply(
     package_name: String,
     version: String,

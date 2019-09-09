@@ -19,6 +19,7 @@ pub fn unzip(input: &PathBuf, output: &PathBuf) -> bool {
         let mut outpath = output.clone();
         outpath.push(file.sanitized_name());
         if (&*file.name()).ends_with('/') {
+            #[cfg(debug_assertions)]
             println!(
                 "File {} extracted to \"{}\"",
                 i,
@@ -28,6 +29,7 @@ pub fn unzip(input: &PathBuf, output: &PathBuf) -> bool {
                 return false;
             }
         } else {
+            #[cfg(debug_assertions)]
             println!(
                 "File {} extracted to \"{}\" ({} bytes)",
                 i,
