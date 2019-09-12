@@ -21,6 +21,7 @@ LegalCopyright = "Copyright © 2019"
 winres = "0.1"
 
 [dependencies]
+windows-service = "0.2.0"
 zip = "0.5"
 fs_extra = { git = "https://github.com/webdesus/fs_extra.git" }
 version-compare = "0.0.9"

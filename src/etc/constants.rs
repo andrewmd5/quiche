@@ -4,6 +4,7 @@ use std::fmt;
 #[derive(Debug)]
 pub enum BootstrapError {
     ElevationRequired,
+    ServiceMissing(String),
     DismFailed(String),
     ArchitectureUnsupported,
     WindowsVersionUnsupported,
@@ -31,6 +32,7 @@ impl fmt::Display for BootstrapError {
         match *self {
             BootstrapError::ElevationRequired => write!(f, "Please run the Rainway Boostrapper as Administrator."),
             BootstrapError::DismFailed(ref s) => write!(f, "DISM failed to launch: {0}", s),
+            BootstrapError::ServiceMissing(ref s) => write!(f, "Unable to start the system service {0} because it is not installed.", s),
             BootstrapError::ArchitectureUnsupported => write!(f, "Rainway is currently only supported by x64 operating systems."),
             BootstrapError::WindowsVersionUnsupported => write!(f, "Rainway is currently only supported on Windows 10 and Windows Server 2016+."),
             BootstrapError::NeedWindowsMediaPack(ref s) => write!(f, "A required video codec is missing from your system. Please install the Windows Media Pack for {}.\n\nPress \"Ok\" to open the codec download page.", s),

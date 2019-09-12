@@ -258,7 +258,7 @@ where
 
 /// TODO
 /// Rolling back if any steps fail.
-/// Checking for failures. 
+/// Checking for failures.
 pub fn apply(
     package_name: String,
     version: String,

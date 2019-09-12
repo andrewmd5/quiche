@@ -1,7 +1,6 @@
 use crate::etc::constants::BootstrapError;
 use regex::Regex;
 
-
 use std::process::Command;
 use winreg::enums::*;
 use winreg::RegKey;
