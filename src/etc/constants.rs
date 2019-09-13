@@ -4,6 +4,9 @@ use std::fmt;
 #[derive(Debug)]
 pub enum BootstrapError {
     ElevationRequired,
+    ServiceConnectionFailure,
+    ServiceOpenFailure,
+    ServiceQueryFailed,
     ServiceMissing(String),
     DismFailed(String),
     ArchitectureUnsupported,
@@ -32,6 +35,9 @@ impl fmt::Display for BootstrapError {
         match *self {
             BootstrapError::ElevationRequired => write!(f, "Please run the Rainway Boostrapper as Administrator."),
             BootstrapError::DismFailed(ref s) => write!(f, "DISM failed to launch: {0}", s),
+            BootstrapError::ServiceConnectionFailure => write!(f, "Failed to connect to the system service manager."),
+            BootstrapError::ServiceOpenFailure => write!(f, "Failed to open target service for interaction."),
+            BootstrapError::ServiceQueryFailed => write!(f, "Failed to query status of the service."),
             BootstrapError::ServiceMissing(ref s) => write!(f, "Unable to start the system service {0} because it is not installed.", s),
             BootstrapError::ArchitectureUnsupported => write!(f, "Rainway is currently only supported by x64 operating systems."),
             BootstrapError::WindowsVersionUnsupported => write!(f, "Rainway is currently only supported on Windows 10 and Windows Server 2016+."),

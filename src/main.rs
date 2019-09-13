@@ -7,9 +7,9 @@ mod net;
 mod os;
 mod ui;
 mod updater;
-
 use etc::constants::{is_compiled_for_64_bit, BootstrapError};
-use etc::rainway::{error_on_duplicate_session, is_installed, is_outdated};
+use etc::rainway::{error_on_duplicate_session, is_installed, is_outdated, kill_rainway_processes};
+use os::service::start_service;
 use os::windows::{get_system_info, needs_media_pack};
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, verify_update};
@@ -27,6 +27,7 @@ fn main() -> Result<(), BootstrapError> {
     if let Err(e) = error_on_duplicate_session() {
         return Err(e);
     }
+    kill_rainway_processes();
     let rainway_installed = match is_installed() {
         Ok(i) => i,
         Err(e) => {
@@ -35,7 +36,6 @@ fn main() -> Result<(), BootstrapError> {
             return Err(e);
         }
     };
-
     let mut update = ActiveUpdate::default();
     if !rainway_installed {
         update.update_type = UpdateType::Install;
@@ -64,29 +64,30 @@ fn main() -> Result<(), BootstrapError> {
     match updater::get_branch(updater::ReleaseBranch::Stable) {
         Some(b) => update.branch = b,
         None => {
-            let e = BootstrapError::ReleaseLookupFailed;
-            show_error(caption, format!("{}", e));
-            return Err(e);
+            if rainway_installed {
+                println!("Unable to check for latest branch. Starting current version.");
+                start_service(env!("RAINWAY_SERVICE"))?;
+                return Ok(());
+            } else {
+                let e = BootstrapError::ReleaseLookupFailed;
+                show_error(caption, format!("{}", e));
+                return Err(e);
+            }
         }
     }
     update.temp_name = format!("{}{}", update.get_hash(), update.get_ext());
     //check if Rainway requires an update if it's installed
     if rainway_installed {
-        match is_outdated(&update.branch.version) {
-            Some(outdated) => {
-                if !outdated {
-                    println!("Shutting down because we're up-to-date.");
-                    println!("TODO check if Rainway is running or not, launch if not.");
-                    return Ok(());
-                }
-            }
-            None => {
-                println!("Shutting down because we failed to check if we are outdated.");
-                return Ok(());
-            }
+        let outdated = match is_outdated(&update.branch.version) {
+            Some(o) => o,
+            None => false,
+        };
+        if !outdated {
+            println!("Rainway is not outdated, starting.");
+            start_service(env!("RAINWAY_SERVICE"))?;
+            return Ok(());
         }
     }
-
     // println!("{}", update.branch.manifest.unwrap().package.url);;
 
     // if we're here, it means we need to update Rainway or install it.

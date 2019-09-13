@@ -1,7 +1,7 @@
 use crate::etc::constants::BootstrapError;
 use crate::os::windows::get_uninstallers;
 use std::process;
-
+use sysinfo::{ProcessExt, Signal, SystemExt};
 use version_compare::{CompOp, Version, VersionCompare};
 
 /// Derives if Rainway is currently installed based on
@@ -56,4 +56,15 @@ pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
         }
     }
     Ok(())
+}
+
+pub fn kill_rainway_processes() {
+    let sys = sysinfo::System::new();
+    for (_pid, proc_) in sys.get_process_list() {
+        if proc_.name() == "Rainway.exe" || proc_.name() == "CefSharp.BrowserSubprocess.exe" {
+            if proc_.kill(Signal::Kill) {
+                println!("Killed {}", proc_.name());
+            }
+        }
+    }
 }

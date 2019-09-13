@@ -19,6 +19,10 @@ fn main() {
             find_cargo_field("release_url")
         );
         println!(
+            "cargo:rustc-env=RAINWAY_SERVICE={}",
+            find_cargo_field("service_name")
+        );
+        println!(
             "cargo:rustc-env=RAINWAY_DOWNLOAD_FORMAT={}",
             find_cargo_field("downloaded_format")
         );
