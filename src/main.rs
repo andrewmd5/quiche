@@ -21,7 +21,7 @@ use ui::window::set_dpi_aware;
 use updater::{ActiveUpdate, UpdateType};
 
 use rust_embed::RustEmbed;
-use web_view::*;
+use web_view::{Content, WVResult, WebView};
 
 #[derive(RustEmbed)]
 #[folder = "resources/"]

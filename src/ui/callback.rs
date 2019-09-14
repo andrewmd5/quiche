@@ -1,5 +1,5 @@
 use threadpool::ThreadPool;
-use web_view::*;
+use web_view::WebView;
 
 thread_local!(static POOL: ThreadPool = ThreadPool::new(4));
 

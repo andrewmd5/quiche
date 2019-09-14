@@ -4,7 +4,7 @@ use crate::io::disk::{delete_dir_contents, dir_contains_all_files, get_dir_files
 use crate::io::hash::sha_256;
 use crate::io::zip::unzip;
 use crate::net::http::{download_file, download_toml};
-use fs_extra::dir::*;
+use fs_extra::dir::{copy, move_dir, CopyOptions};
 use serde::Deserialize;
 use std::fs;
 

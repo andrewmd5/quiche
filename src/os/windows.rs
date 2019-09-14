@@ -2,7 +2,7 @@ use crate::etc::constants::BootstrapError;
 use regex::Regex;
 
 use std::process::Command;
-use winreg::enums::*;
+use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
 use winreg::RegKey;
 
 /// dism.exe will return exit code 740 if it is launched
