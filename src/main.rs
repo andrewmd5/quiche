@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-#![windows_subsystem = "windows"]
+//#![windows_subsystem = "windows"]
 
 mod etc;
 mod io;
@@ -110,6 +110,7 @@ fn main() -> Result<(), BootstrapError> {
         .title("Rainway Boostrapper")
         .content(Content::Html(html))
         .size(800, 600)
+        .user_data(0)
         .resizable(false)
         .invoke_handler(|_webview, arg| handler(_webview, arg, &update))
         .build()?;

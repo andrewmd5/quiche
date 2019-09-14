@@ -1,8 +1,7 @@
-use threadpool::ThreadPool;
+use std::thread;
 use web_view::WebView;
 
-thread_local!(static POOL: ThreadPool = ThreadPool::new(4));
-
+/// runs a task on a new thread as not to block the UI
 pub fn run_async<T: 'static, F: FnOnce() -> Result<String, String> + Send + 'static>(
     webview: &mut WebView<'_, T>,
     what: F,
@@ -10,13 +9,11 @@ pub fn run_async<T: 'static, F: FnOnce() -> Result<String, String> + Send + 'sta
     error: String,
 ) {
     let handle = webview.handle();
-    POOL.with(|thread| {
-        thread.execute(move || {
-            let callback_string = format_callback_result(what(), callback, error);
+    thread::spawn(move || {
+        let callback_string = format_callback_result(what(), callback, error);
             handle
                 .dispatch(move |_webview| _webview.eval(callback_string.as_str()))
                 .unwrap()
-        });
     });
 }
 
