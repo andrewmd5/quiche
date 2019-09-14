@@ -93,12 +93,16 @@ fn is_x64() -> Result<bool, BootstrapError> {
 /// Windows N/KN do not have required codecs installed by default, so we need to prompt users.
 /// This function requires the process to be elevated.
 pub fn needs_media_pack() -> Result<bool, BootstrapError> {
-    use std::process::{Command};
-use std::os::windows::process::{CommandExt};
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
     let tool = "dism";
     let args = ["/Online", "/Get-Packages"];
 
-    let process = match Command::new(tool).args(&args).creation_flags(0x08000000).output() {
+    let process = match Command::new(tool)
+        .args(&args)
+        .creation_flags(0x08000000)
+        .output()
+    {
         Err(e) => return Err(BootstrapError::DismFailed(e.to_string())),
         Ok(o) => o,
     };

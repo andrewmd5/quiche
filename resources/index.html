@@ -1,13 +1,35 @@
 <!doctype html>
 <html>
 
+<head>
+    <style>
+        #myProgress {
+            width: 100%;
+            background-color: #ddd;
+        }
+
+        #myBar {
+            width: 0%;
+            height: 30px;
+            background-color: #4CAF50;
+            text-align: center;
+            line-height: 30px;
+            color: white;
+        }
+    </style>
+</head>
+
 <body>
     <p id="ticks"></p>
     <button onclick="external.invoke('download')">download</button>
     <button onclick="external.invoke('exit')">exit</button>
     <script type="text/javascript">
         function downloadProgress(v, total, downloaded) {
-            document.getElementById('ticks').innerHTML = 'Download Progress for Rainway ' + v + '</br> Total Bytes: ' + total + '</br> Downloaded Bytes: ' + downloaded;
+            var elem = document.getElementById("myBar");   
+            var progress = Math.ceil(downloaded / total * 100);
+            elem.style.width = progress + '%'; 
+            elem.innerHTML = progress * 1  + '%';
+            document.getElementById('ticks').innerHTML = 'Download Progress for Rainway ' + v;
         }
         function downloadFailed(e) {
             document.getElementById('ticks').innerHTML = 'Download failed! ' + e;
@@ -46,6 +68,10 @@
             document.getElementById('ticks').innerHTML = 'ticks ' + n;
         }
     </script>
+
+    <div id="myProgress">
+        <div id="myBar">0%</div>
+    </div>
 </body>
 
 </html>
