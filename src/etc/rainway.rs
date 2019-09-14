@@ -1,3 +1,5 @@
+use crate::ui::messagebox::show_error;
+use crate::os::service::start_service;
 use crate::etc::constants::BootstrapError;
 use crate::os::windows::get_uninstallers;
 use std::process;
@@ -56,6 +58,16 @@ pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
         }
     }
     Ok(())
+}
+
+pub fn launch_rainway() {
+     match start_service(env!("RAINWAY_SERVICE")) {
+         Ok(s) => println!("Rainway started: {}", s),
+         Err(e) => {
+              show_error("Rainway Startup Failure", format!("{}", e));
+              sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
+         }
+     }
 }
 
 pub fn kill_rainway_processes() {

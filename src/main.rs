@@ -8,7 +8,7 @@ mod os;
 mod ui;
 mod updater;
 use etc::constants::{is_compiled_for_64_bit, BootstrapError};
-use etc::rainway::{error_on_duplicate_session, is_installed, is_outdated, kill_rainway_processes};
+use etc::rainway::{launch_rainway, error_on_duplicate_session, is_installed, is_outdated, kill_rainway_processes};
 use os::service::start_service;
 use os::windows::{get_system_info, needs_media_pack};
 use ui::messagebox::{show_error, show_error_with_url};
@@ -66,7 +66,7 @@ fn main() -> Result<(), BootstrapError> {
         None => {
             if rainway_installed {
                 println!("Unable to check for latest branch. Starting current version.");
-                start_service(env!("RAINWAY_SERVICE"))?;
+                launch_rainway();
                 return Ok(());
             } else {
                 let e = BootstrapError::ReleaseLookupFailed;
@@ -84,7 +84,7 @@ fn main() -> Result<(), BootstrapError> {
         };
         if !outdated {
             println!("Rainway is not outdated, starting.");
-            start_service(env!("RAINWAY_SERVICE"))?;
+            launch_rainway();
             return Ok(());
         }
     }
