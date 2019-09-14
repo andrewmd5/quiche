@@ -8,11 +8,13 @@ mod os;
 mod ui;
 mod updater;
 use etc::constants::{is_compiled_for_64_bit, BootstrapError};
-use etc::rainway::{launch_rainway, error_on_duplicate_session, is_installed, is_outdated, kill_rainway_processes};
-use os::service::start_service;
+use etc::rainway::{
+    error_on_duplicate_session, is_installed, is_outdated, kill_rainway_processes, launch_rainway,
+};
+
 use os::windows::{get_system_info, needs_media_pack};
 use ui::messagebox::{show_error, show_error_with_url};
-use ui::view::{apply_update, download_update, verify_update};
+use ui::view::{apply_update, download_update, launch_and_close, verify_update};
 use updater::{ActiveUpdate, UpdateType};
 
 use web_view::*;
@@ -24,10 +26,13 @@ fn main() -> Result<(), BootstrapError> {
     if !cfg!(debug_assertions) && is_compiled_for_64_bit() {
         panic!("Build against i686-pc-windows-msvc for production releases.")
     }
+    
     if let Err(e) = error_on_duplicate_session() {
         return Err(e);
     }
+
     kill_rainway_processes();
+
     let rainway_installed = match is_installed() {
         Ok(i) => i,
         Err(e) => {
@@ -36,6 +41,7 @@ fn main() -> Result<(), BootstrapError> {
             return Err(e);
         }
     };
+    
     let mut update = ActiveUpdate::default();
     if !rainway_installed {
         update.update_type = UpdateType::Install;
@@ -78,7 +84,7 @@ fn main() -> Result<(), BootstrapError> {
     update.temp_name = format!("{}{}", update.get_hash(), update.get_ext());
     //check if Rainway requires an update if it's installed
     if rainway_installed {
-        let outdated = match is_outdated(&update.branch.version) {
+        let outdated = match is_outdated(&update.branch.version, update.get_package_files()) {
             Some(o) => o,
             None => false,
         };
@@ -88,11 +94,6 @@ fn main() -> Result<(), BootstrapError> {
             return Ok(());
         }
     }
-    // println!("{}", update.branch.manifest.unwrap().package.url);;
-
-    // if we're here, it means we need to update Rainway or install it.
-    // TODO kill all rainway processes at this point, if they exist.
-    // TODO spawn the UI
 
     let webview = web_view::builder()
         .title("Rainway Boostrapper")
@@ -139,6 +140,9 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         "apply" => {
             apply_update(webview, update);
         }
+        "launch" => {
+            launch_and_close(webview);
+        }
         "exit" => {
             std::process::exit(0);
         }
@@ -180,7 +184,7 @@ const HTML: &str = r#"
 				document.getElementById('ticks').innerHTML = 'Rainway Installed/Updated! Closing...';
                 setTimeout(
     function() {
-      external.invoke('exit')
+      external.invoke('launch')
     }, 2500);
 
 			}

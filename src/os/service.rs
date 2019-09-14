@@ -5,10 +5,12 @@ use windows_service::{
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
 
+/// Checks if a service is installed on Windows via name.
 pub fn service_exist(service_name: &str) -> bool {
     let manager_access = ServiceManagerAccess::CONNECT;
     if let Ok(service_manager) = ServiceManager::local_computer(None::<&str>, manager_access) {
-        if let Ok(_service) = service_manager.open_service(service_name, ServiceAccess::QUERY_CONFIG)
+        if let Ok(_service) =
+            service_manager.open_service(service_name, ServiceAccess::QUERY_CONFIG)
         {
             return true;
         }

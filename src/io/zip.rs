@@ -2,6 +2,8 @@ use std::fs::{create_dir_all, File};
 use std::io;
 use std::path::PathBuf;
 
+/// unzips an archive to a target directory, 
+/// returning false if any files false.
 pub fn unzip(input: &PathBuf, output: &PathBuf) -> bool {
     let input_file = match File::open(&input) {
         Ok(f) => f,

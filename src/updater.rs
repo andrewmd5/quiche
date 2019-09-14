@@ -1,6 +1,6 @@
 use crate::etc::constants::BootstrapError;
 use crate::etc::rainway::get_install_path;
-use crate::io::disk::{delete_dir_contents, dir_contains_all_files};
+use crate::io::disk::{delete_dir_contents, dir_contains_all_files, get_dir_files};
 use crate::io::hash::sha_256;
 use crate::io::zip::unzip;
 use crate::net::http::{download_file, download_toml};
@@ -62,7 +62,6 @@ pub enum UpdateState {
 #[derive(Default)]
 pub struct ActiveUpdate {
     pub update_type: UpdateType,
-    pub state: UpdateState,
     pub branch: Branch,
     pub temp_name: String,
 }
@@ -202,6 +201,12 @@ pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
     Some(releases.stable)
 }
 
+/// checks if all the files present in a vector exist in a given directory.
+pub fn validate_files(target_files: Vec<String>, input: String) -> bool {
+    dir_contains_all_files(target_files, &input)
+}
+
+/// checks if the downloaded file hash matches that of the one in the manifest.
 pub fn verify(remote_hash: String, input_file: String) -> Result<String, String> {
     let mut download_path = env::temp_dir();
     download_path.push(input_file);
@@ -216,7 +221,7 @@ pub fn verify(remote_hash: String, input_file: String) -> Result<String, String>
         return err;
     }
 }
-
+/// downloads a file from an HTTP server with a progress callback.
 pub fn download_with_callback<F>(
     url: String,
     output_file: String,
@@ -256,54 +261,111 @@ where
     results
 }
 
-/// TODO
-/// Rolling back if any steps fail.
-/// Checking for failures.
-pub fn apply(
-    package_name: String,
-    version: String,
-    package_files: Vec<String>,
-) -> Result<String, String> {
+/// applies an update package from a remote manifest.
+/// if any issues are encountered then the process will be rolled back.  
+pub fn apply(package_name: String, version: String) -> Result<String, String> {
     let mut download_path = env::temp_dir();
     download_path.push(package_name);
     // TODO error handling here
-    let install_path = get_install_path().unwrap_or_default();
+    let install_path = match get_install_path() {
+        Some(p) => p,
+        None => {
+            return Err(BootstrapError::InstallationFailed(
+                "Unable to locate default install path.".to_string(),
+            )
+            .to_string())
+        }
+    };
 
     let mut update_staging_path = env::temp_dir();
     update_staging_path.push(format!("Rainway_Stage_{}", &version));
     if update_staging_path.exists() {
-        fs::remove_dir_all(&update_staging_path).unwrap();
+        if let Err(e) = fs::remove_dir_all(&update_staging_path) {
+            let stage_clean_error = format!(
+                "Aborted update due to modification failure on stage {}: {}",
+                update_staging_path.display(),
+                e
+            );
+            return Err(BootstrapError::InstallationFailed(stage_clean_error).to_string());
+        }
     }
 
-    //TODO break out some of these into their on io fns
     let mut backup_path = env::temp_dir();
     backup_path.push(format!("Rainway_Backup_{}", &version));
     if backup_path.exists() {
-        fs::remove_dir_all(&backup_path).unwrap();
+        if let Err(e) = fs::remove_dir_all(&backup_path) {
+            let backup_clean_error = format!(
+                "Aborted update due to modification failure on backup {}: {}",
+                backup_path.display(),
+                e
+            );
+            return Err(BootstrapError::InstallationFailed(backup_clean_error).to_string());
+        }
     }
     let mut options = CopyOptions::new();
     options.copy_inside = true;
     options.content_only = true;
     options.overwrite = true;
     //make the backup
-    copy(&install_path, &backup_path, &options).unwrap();
+    if let Err(e) = copy(&install_path, &backup_path, &options) {
+        let backup_error = format!(
+            "Unable to backup installation to {}: {}",
+            backup_path.display(),
+            e
+        );
+        return Err(BootstrapError::InstallationFailed(backup_error).to_string());
+    }
     //stage the update
-    unzip(&download_path, &update_staging_path);
+    if !unzip(&download_path, &update_staging_path) {
+        return Err(BootstrapError::InstallationFailed(format!(
+            "Unable to extract update to {}",
+            update_staging_path.display()
+        ))
+        .to_string());
+    }
 
     //delete the install without deleting the root folder.
     let demo_dir = fs::read_dir(&install_path);
-    delete_dir_contents(demo_dir, vec!["pick.txt".to_string()]);
-    // TODO check if all files present
-    // move update to install path
-    //  println!("{}", &update_staging_path.display());
+    if let Err(e) = delete_dir_contents(demo_dir, vec!["pick.txt".to_string()]) {
+        let delete_error = format!(
+            "Unable to cleanup current installation located at {} due to: {}",
+            &install_path, e
+        );
+        if let Ok(_e) = move_dir(&backup_path, &install_path, &options) {
+            println!("rolled back update process.");
+        } else {
+            println!("failed to rollback update process.")
+        }
+        return Err(BootstrapError::InstallationFailed(delete_error).to_string());
+    }
 
-    move_dir(&update_staging_path, &install_path, &options).unwrap();
-    dir_contains_all_files(package_files, &install_path);
+    //apply the update
+    match move_dir(&update_staging_path, &install_path, &options) {
+        Ok(_o) => {
+            if let Some(fs) = get_dir_files(&install_path) {
+                for f in fs {
+                    println!("{}", f);
+                }
+            }
+            return Ok("'Rainway Updated!'".to_string());
+        }
+        Err(e) => {
+            let update_error_message = format!(
+                "Failed to apply update to {} from {}: {}",
+                &install_path,
+                &update_staging_path.display(),
+                e
+            );
+            if let Ok(_e) = move_dir(&backup_path, &install_path, &options) {
+                println!("rolled back update.");
+            } else {
+                println!("failed to rollback update.")
+            }
+            return Err(BootstrapError::InstallationFailed(update_error_message).to_string());
+        }
+    }
 
-    //TODO all the error handling
-    //TODO start rainway
-
-    Ok(String::default())
+    //dir_contains_all_files(package_files, &install_path);
 }
 
 /// Runs the full installer and waits for it to exit.
