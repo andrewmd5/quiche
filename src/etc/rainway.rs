@@ -2,7 +2,7 @@ use crate::etc::constants::BootstrapError;
 use crate::os::service::start_service;
 use crate::os::windows::get_uninstallers;
 use crate::ui::messagebox::show_error;
-use crate::updater::validate_files;
+use crate::updater::{validate_files, ReleaseBranch};
 use std::process;
 use sysinfo::{ProcessExt, Signal, SystemExt};
 use version_compare::Version;
@@ -25,6 +25,11 @@ fn get_installed_version() -> Option<String> {
 pub fn get_install_path() -> Option<String> {
     let registry_path = String::from("E:\\UpdateTest\\InstalledFolder\\");
     Some(registry_path)
+}
+
+/// TODO pull the branch a user has selcted from the registry.
+pub fn get_config_branch() -> ReleaseBranch {
+    ReleaseBranch::from("Stable".to_string())
 }
 
 /// Checks if the current Rainway installation is out of date.
@@ -64,6 +69,7 @@ pub fn is_outdated(remote_version: &String, files: Vec<String>) -> Option<bool> 
     None
 }
 
+/// returns an error if the bootstrapper is already open
 pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
     let sys = sysinfo::System::new();
     let current_pid = process::id();

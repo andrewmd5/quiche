@@ -39,7 +39,7 @@ where
     }
     let toml = response.text()?;
     match toml::from_str(&toml) {
-        Err(_e) => return Err(BootstrapError::TomlParseFailure),
+        Err(e) => return Err(BootstrapError::TomlParseFailure(url.to_string(), e.to_string())),
         Ok(model) => return Ok(model),
     };
 }
@@ -56,7 +56,7 @@ pub fn download_file(
     if !head_response.status().is_success() {
         writer.faulted = true;
         drop(writer);
-        return Err(BootstrapError::RemoteFileMissing);
+        return Err(BootstrapError::RemoteFileMissing(url.to_string()));
     }
     let total_size = head_response
         .headers()
@@ -67,7 +67,7 @@ pub fn download_file(
     if total_size <= 0 {
         writer.faulted = true;
         drop(writer);
-        return Err(BootstrapError::RemoteFileMissing);
+        return Err(BootstrapError::RemoteFileEmpty(url.to_string()));
     }
     writer.total_bytes = total_size;
     drop(writer);

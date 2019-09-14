@@ -171,7 +171,7 @@ pub struct Package {
 
 /// fetches all the available releases for each branch.
 fn get_releases() -> Option<Releases> {
-    match download_toml::<Releases>("http://local.vg:8080/Releases.toml") {
+    match download_toml::<Releases>(env!("RAINWAY_RELEASE_URL")) {
         Ok(r) => return Some(r),
         Err(e) => {
             // Send just in case its not a network error.
@@ -192,7 +192,7 @@ pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
     releases.stable.manifest = match download_toml::<Manifest>(&releases.stable.manifest_url) {
         Ok(m) => Some(m),
         Err(e) => {
-            sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
+            sentry::capture_message(format!("Failed to fetch branch {}: {}", branch, e).as_str(), sentry::Level::Error);
             // This is an unrecoverable issue, so we return None
             // and present a generic error message.
             return None;

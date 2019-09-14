@@ -9,7 +9,7 @@ mod ui;
 mod updater;
 use etc::constants::{is_compiled_for_64_bit, BootstrapError};
 use etc::rainway::{
-    error_on_duplicate_session, is_installed, is_outdated, kill_rainway_processes, launch_rainway,
+    error_on_duplicate_session, is_installed, is_outdated, kill_rainway_processes, launch_rainway, get_config_branch
 };
 
 use os::windows::{get_system_info, needs_media_pack};
@@ -66,8 +66,9 @@ fn main() -> Result<(), BootstrapError> {
             },
         }
     }
+    
     //regardless of whether we need to update or install, we need the latest branch.
-    match updater::get_branch(updater::ReleaseBranch::Stable) {
+    match updater::get_branch(get_config_branch()) {
         Some(b) => update.branch = b,
         None => {
             if rainway_installed {

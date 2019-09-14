@@ -1,7 +1,7 @@
 use fs_extra::dir::get_dir_content;
 use std::ffi::OsStr;
 use std::fs::{self, ReadDir};
-use std::io::{Error, ErrorKind};
+use std::io::{Error};
 use std::path::{Path, PathBuf};
 
 /// checks if a directory contains all the files in a vector

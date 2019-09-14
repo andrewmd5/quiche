@@ -23,10 +23,6 @@ fn main() {
             find_cargo_field("service_name")
         );
         println!(
-            "cargo:rustc-env=RAINWAY_DOWNLOAD_FORMAT={}",
-            find_cargo_field("downloaded_format")
-        );
-        println!(
             "cargo:rustc-env=MEDIA_PACK_URL={}",
             find_cargo_field("media_pack_url")
         );

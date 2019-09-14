@@ -6,8 +6,7 @@ edition = "2018"
 build = "build.rs"
 
 [package.rainway]
-release_url = "https://releases.rainway.com/Installer_current.json"
-downloaded_format = "https://releases.rainway.com/{}_{}.exe"
+release_url = "http://local.vg:8080/Releases.toml"
 media_pack_url = "https://www.microsoft.com/en-us/software-download/mediafeaturepack"
 sentry_dns = "https://f3f4e8ff17b04538bffd1e8794e1dc05@sentry.io/1548204"
 service_name = "RainwayRadar"
