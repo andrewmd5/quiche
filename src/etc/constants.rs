@@ -69,7 +69,7 @@ impl From<String> for ReleaseBranch {
             "stable" => ReleaseBranch::Stable,
             "nightly" => ReleaseBranch::Nightly,
             "beta" => ReleaseBranch::Beta,
-            _ => unimplemented!() // TODO
+            _ => ReleaseBranch::Stable, 
         }
     }
 }

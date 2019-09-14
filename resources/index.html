@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+
+<body>
+    <p id="ticks"></p>
+    <button onclick="external.invoke('download')">download</button>
+    <button onclick="external.invoke('exit')">exit</button>
+    <script type="text/javascript">
+        function downloadProgress(v, total, downloaded) {
+            document.getElementById('ticks').innerHTML = 'Download Progress for Rainway ' + v + '</br> Total Bytes: ' + total + '</br> Downloaded Bytes: ' + downloaded;
+        }
+        function downloadFailed(e) {
+            document.getElementById('ticks').innerHTML = 'Download failed! ' + e;
+        }
+        function downloadComplete(e) {
+            document.getElementById('ticks').innerHTML = 'Download Done! Verifying the update... ' + e;
+            external.invoke('verify')
+        }
+
+
+        function verificationComplete(e) {
+            document.getElementById('ticks').innerHTML = 'Verified the update! Installing...';
+            external.invoke('apply')
+
+        }
+        function verificationFailed(e) {
+            document.getElementById('ticks').innerHTML = e;
+        }
+
+        function updateComplete(e) {
+            document.getElementById('ticks').innerHTML = 'Rainway Installed/Updated! Closing...';
+            setTimeout(
+                function () {
+                    external.invoke('launch')
+                }, 2500);
+
+        }
+        function updateFailed(e) {
+            document.getElementById('ticks').innerHTML = e;
+        }
+
+        function updateTicks(n) {
+            document.getElementById('ticks').innerHTML = 'ticks ' + n;
+        }
+        function test(n) {
+            document.getElementById('ticks').innerHTML = 'ticks ' + n;
+        }
+    </script>
+</body>
+
+</html>

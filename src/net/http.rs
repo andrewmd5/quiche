@@ -39,7 +39,12 @@ where
     }
     let toml = response.text()?;
     match toml::from_str(&toml) {
-        Err(e) => return Err(BootstrapError::TomlParseFailure(url.to_string(), e.to_string())),
+        Err(e) => {
+            return Err(BootstrapError::TomlParseFailure(
+                url.to_string(),
+                e.to_string(),
+            ))
+        }
         Ok(model) => return Ok(model),
     };
 }

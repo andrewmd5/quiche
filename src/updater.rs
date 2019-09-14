@@ -192,7 +192,10 @@ pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
     releases.stable.manifest = match download_toml::<Manifest>(&releases.stable.manifest_url) {
         Ok(m) => Some(m),
         Err(e) => {
-            sentry::capture_message(format!("Failed to fetch branch {}: {}", branch, e).as_str(), sentry::Level::Error);
+            sentry::capture_message(
+                format!("Failed to fetch branch {}: {}", branch, e).as_str(),
+                sentry::Level::Error,
+            );
             // This is an unrecoverable issue, so we return None
             // and present a generic error message.
             return None;

@@ -13,25 +13,37 @@ pub fn find_cargo_field(key: &'static str) -> &'static str {
 }
 
 fn main() {
-    if cfg!(target_os = "windows") {
-        println!(
-            "cargo:rustc-env=RAINWAY_RELEASE_URL={}",
-            find_cargo_field("release_url")
-        );
-        println!(
-            "cargo:rustc-env=RAINWAY_SERVICE={}",
-            find_cargo_field("service_name")
-        );
-        println!(
-            "cargo:rustc-env=MEDIA_PACK_URL={}",
-            find_cargo_field("media_pack_url")
-        );
-        println!(
-            "cargo:rustc-env=SENTRY_DNS={}",
-            find_cargo_field("sentry_dns")
-        );
-        let mut res = winres::WindowsResource::new();
-        res.set_manifest_file("manifest.xml");
-        res.compile().unwrap();
+    if !cfg!(target_os = "windows") {
+        panic!("Only Windows builds are supported.");
     }
+    let profile = std::env::var("PROFILE").unwrap();
+    match profile.as_str() {
+        "release" => {
+            let target = std::env::var("TARGET").unwrap();
+            if target != "i686-pc-windows-msvc" {
+                panic!("Build against i686-pc-windows-msvc for production releases. Only x32 is supported.");
+            }
+        }
+        _ => (),
+    }
+    println!(
+        "cargo:rustc-env=RAINWAY_RELEASE_URL={}",
+        find_cargo_field("release_url")
+    );
+    println!(
+        "cargo:rustc-env=RAINWAY_SERVICE={}",
+        find_cargo_field("service_name")
+    );
+    println!(
+        "cargo:rustc-env=MEDIA_PACK_URL={}",
+        find_cargo_field("media_pack_url")
+    );
+    println!(
+        "cargo:rustc-env=SENTRY_DNS={}",
+        find_cargo_field("sentry_dns")
+    );
+    let mut res = winres::WindowsResource::new();
+    res.set_icon("resources/ProgramIcon.ico");
+    res.set_manifest_file("manifest.xml");
+    res.compile().unwrap();
 }

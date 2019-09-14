@@ -1,3 +1,4 @@
+use crate::os::windows::{get_system_info, needs_media_pack};
 use crate::etc::constants::BootstrapError;
 use crate::os::service::start_service;
 use crate::os::windows::get_uninstallers;
@@ -25,6 +26,11 @@ fn get_installed_version() -> Option<String> {
 pub fn get_install_path() -> Option<String> {
     let registry_path = String::from("E:\\UpdateTest\\InstalledFolder\\");
     Some(registry_path)
+}
+
+/// TODO do this at the end of a good update
+pub fn update_installed_version() {
+
 }
 
 /// TODO pull the branch a user has selcted from the registry.
@@ -102,4 +108,25 @@ pub fn kill_rainway_processes() {
             }
         }
     }
+}
+
+/// checks if the current system is compatible with Rainway
+pub fn check_system_compatibility() -> Result<(), BootstrapError> {
+    let system_info = get_system_info()?;
+    if !system_info.is_x64 {
+        return Err(BootstrapError::ArchitectureUnsupported);
+    }
+
+    if !system_info.is_supported {
+        return Err(BootstrapError::WindowsVersionUnsupported);
+    }
+
+    if system_info.is_n_edition {
+        if needs_media_pack()? {
+            return Err(BootstrapError::NeedWindowsMediaPack(
+                system_info.product_name,
+            ));
+        }
+    }
+    Ok(())
 }
