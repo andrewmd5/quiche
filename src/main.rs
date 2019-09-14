@@ -7,13 +7,12 @@ mod net;
 mod os;
 mod ui;
 mod updater;
-use etc::rainway::check_system_compatibility;
 use etc::constants::{is_compiled_for_64_bit, BootstrapError};
+use etc::rainway::check_system_compatibility;
 use etc::rainway::{
     error_on_duplicate_session, get_config_branch, is_installed, is_outdated,
     kill_rainway_processes, launch_rainway,
 };
-
 
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
@@ -27,7 +26,6 @@ use web_view::{Content, WVResult, WebView};
 #[folder = "resources/"]
 struct Asset;
 
-
 const CAPTION: &str = "Rainway Bootstrapper Error";
 
 fn main() -> Result<(), BootstrapError> {
@@ -37,27 +35,28 @@ fn main() -> Result<(), BootstrapError> {
         panic!("Build against i686-pc-windows-msvc for production releases.")
     }
     if let Err(e) = run() {
-        show_error(CAPTION, format!("{}",  BootstrapError::Generic));
-        panic!("{}", e);
+        match e {
+            BootstrapError::NeedWindowsMediaPack(_) => {
+                show_error_with_url(CAPTION, format!("{}", e), env!("MEDIA_PACK_URL"));
+                panic!("{}", e);
+            }
+            _ => {
+                show_error(CAPTION, format!("{}", e));
+                panic!("{}", e);
+            }
+        }
     }
     Ok(())
 }
 
 fn run() -> Result<(), BootstrapError> {
-     if let Err(e) = error_on_duplicate_session() {
+    if let Err(e) = error_on_duplicate_session() {
         return Err(e);
     }
 
     kill_rainway_processes();
 
-    let rainway_installed = match is_installed() {
-        Ok(i) => i,
-        Err(e) => {
-            show_error(CAPTION, format!("{}", e));
-            sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
-            return Err(e);
-        }
-    };
+    let rainway_installed = is_installed()?;
     let mut update = ActiveUpdate::default();
     if !rainway_installed {
         update.update_type = UpdateType::Install;
@@ -66,21 +65,7 @@ fn run() -> Result<(), BootstrapError> {
     }
 
     if !rainway_installed {
-        match check_system_compatibility() {
-            Ok(go) => go,
-            Err(e) => match e {
-                BootstrapError::NeedWindowsMediaPack(_) => {
-                    show_error_with_url(CAPTION, format!("{}", e), env!("MEDIA_PACK_URL"));
-                    sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
-                    return Err(e);
-                }
-                _ => {
-                    show_error(CAPTION, format!("{}", e));
-                    sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
-                    return Err(e);
-                }
-            },
-        }
+        check_system_compatibility()?;
     }
     //regardless of whether we need to update or install, we need the latest branch.
     match updater::get_branch(get_config_branch()) {
@@ -91,9 +76,7 @@ fn run() -> Result<(), BootstrapError> {
                 launch_rainway();
                 return Ok(());
             } else {
-                let e = BootstrapError::ReleaseLookupFailed;
-                show_error(CAPTION, format!("{}", e));
-                return Err(e);
+                return Err(BootstrapError::ReleaseLookupFailed);
             }
         }
     }
@@ -120,6 +103,7 @@ fn run() -> Result<(), BootstrapError> {
         .title("Rainway Boostrapper")
         .content(Content::Html(html))
         .size(800, 600)
+        .user_data(0)
         .resizable(false)
         .invoke_handler(|_webview, arg| handler(_webview, arg, &update))
         .build()?;
@@ -128,6 +112,7 @@ fn run() -> Result<(), BootstrapError> {
     Ok(())
 }
 
+/// handles WebView external function calls
 fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveUpdate) -> WVResult {
     match arg {
         "download" => {

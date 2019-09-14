@@ -20,11 +20,6 @@ By using a bootstrapper we also:
 - It's fast. 
 - I like Rust. 
 
-# TODO
-- A basic GUI: Small native progress bar. MessageBox for errors. 
-- Clean up error handling.
-- Realize I probably did something wrong.
-
 # Building
 
 You should always build with a target of `i686-pc-windows-msvc` and to produce a small binary for production use `cargo build --target=i686-pc-windows-msvc --release`. While Rainway only supports x64 systems, we need to be able to present errors on x32 host which is why we targeted i686.

@@ -16,6 +16,8 @@ files = [
 "licenses.zip",
 "lights.pk3",
 "openal32.dll",
+"test dir\\no.txt",
+"test dir\\what\\noway.txt",
 "zd_extra.pk3"
 ]
 

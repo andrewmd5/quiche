@@ -2,8 +2,8 @@ use std::ptr;
 use winapi::shared::windef::RECT;
 use winapi::um::wincon::GetConsoleWindow;
 use winapi::um::winuser::{
-    GetDesktopWindow, GetWindowRect, MoveWindow, SetWindowPos, ShowWindow, HWND_NOTOPMOST,
-    SWP_SHOWWINDOW, SW_HIDE,
+    GetDesktopWindow, GetWindowRect, MoveWindow, SetWindowPos,
+    ShowWindow, HWND_NOTOPMOST, SWP_SHOWWINDOW, SW_HIDE,
 };
 
 /// makes the applications WebView DPI aware.

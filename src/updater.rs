@@ -6,11 +6,10 @@ use crate::io::zip::unzip;
 use crate::net::http::{download_file, download_toml};
 use fs_extra::dir::{copy, move_dir, CopyOptions};
 use serde::Deserialize;
-use std::fs;
 
-use std::process::Command;
 use std::{
-    env,
+    fs::{remove_dir_all, read_dir},
+    env::{temp_dir},
     sync::{Arc, RwLock},
     thread,
     time::Duration,
@@ -211,7 +210,7 @@ pub fn validate_files(target_files: Vec<String>, input: String) -> bool {
 
 /// checks if the downloaded file hash matches that of the one in the manifest.
 pub fn verify(remote_hash: String, input_file: String) -> Result<String, String> {
-    let mut download_path = env::temp_dir();
+    let mut download_path = temp_dir();
     download_path.push(input_file);
     let result: Result<String, String> = Ok(String::default());
     let err: Result<String, String> = Err(BootstrapError::SignatureMismatch.to_string());
@@ -255,7 +254,7 @@ where
         }
         thread::sleep(Duration::from_millis(16));
     });
-    let mut download_path = env::temp_dir();
+    let mut download_path = temp_dir();
     download_path.push(output_file);
     let results = download_file(local_arc, &url, &download_path)
         .map_err(|err| format!("{}", err))
@@ -267,7 +266,7 @@ where
 /// applies an update package from a remote manifest.
 /// if any issues are encountered then the process will be rolled back.  
 pub fn apply(package_name: String, version: String) -> Result<String, String> {
-    let mut download_path = env::temp_dir();
+    let mut download_path = temp_dir();
     download_path.push(package_name);
     // TODO error handling here
     let install_path = match get_install_path() {
@@ -280,10 +279,10 @@ pub fn apply(package_name: String, version: String) -> Result<String, String> {
         }
     };
 
-    let mut update_staging_path = env::temp_dir();
+    let mut update_staging_path = temp_dir();
     update_staging_path.push(format!("Rainway_Stage_{}", &version));
     if update_staging_path.exists() {
-        if let Err(e) = fs::remove_dir_all(&update_staging_path) {
+        if let Err(e) = remove_dir_all(&update_staging_path) {
             let stage_clean_error = format!(
                 "Aborted update due to modification failure on stage {}: {}",
                 update_staging_path.display(),
@@ -293,10 +292,10 @@ pub fn apply(package_name: String, version: String) -> Result<String, String> {
         }
     }
 
-    let mut backup_path = env::temp_dir();
+    let mut backup_path = temp_dir();
     backup_path.push(format!("Rainway_Backup_{}", &version));
     if backup_path.exists() {
-        if let Err(e) = fs::remove_dir_all(&backup_path) {
+        if let Err(e) = remove_dir_all(&backup_path) {
             let backup_clean_error = format!(
                 "Aborted update due to modification failure on backup {}: {}",
                 backup_path.display(),
@@ -328,7 +327,7 @@ pub fn apply(package_name: String, version: String) -> Result<String, String> {
     }
 
     //delete the install without deleting the root folder.
-    let demo_dir = fs::read_dir(&install_path);
+    let demo_dir = read_dir(&install_path);
     if let Err(e) = delete_dir_contents(demo_dir, vec!["pick.txt".to_string()]) {
         let delete_error = format!(
             "Unable to cleanup current installation located at {} due to: {}",
@@ -375,10 +374,13 @@ pub fn apply(package_name: String, version: String) -> Result<String, String> {
 /// The bootstrapper will not launch Rainway after this.
 /// The installer should be configured to launch post-install.
 pub fn install(installer_name: String) -> Result<String, String> {
-    let mut download_path = env::temp_dir();
+    use std::process::Command;
+    use std::os::windows::process::{CommandExt};
+    let mut download_path = temp_dir();
     download_path.push(installer_name);
     Command::new(download_path)
         .args(&[""])
+        .creation_flags(0x08000000)
         .output()
         .map_err(|err| format!("{}", BootstrapError::InstallationFailed(err.to_string())))
         .map(|output| format!("'{}'", output.status.success()))

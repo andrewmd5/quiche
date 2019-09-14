@@ -1,7 +1,7 @@
-use crate::os::windows::{get_system_info, needs_media_pack};
 use crate::etc::constants::BootstrapError;
 use crate::os::service::start_service;
 use crate::os::windows::get_uninstallers;
+use crate::os::windows::{get_system_info, needs_media_pack};
 use crate::ui::messagebox::show_error;
 use crate::updater::{validate_files, ReleaseBranch};
 use std::process;
@@ -29,9 +29,7 @@ pub fn get_install_path() -> Option<String> {
 }
 
 /// TODO do this at the end of a good update
-pub fn update_installed_version() {
-
-}
+pub fn update_installed_version() {}
 
 /// TODO pull the branch a user has selcted from the registry.
 pub fn get_config_branch() -> ReleaseBranch {
@@ -111,6 +109,7 @@ pub fn kill_rainway_processes() {
 }
 
 /// checks if the current system is compatible with Rainway
+/// returns an error for the condition that is not met.
 pub fn check_system_compatibility() -> Result<(), BootstrapError> {
     let system_info = get_system_info()?;
     if !system_info.is_x64 {
