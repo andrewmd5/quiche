@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-//#![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
 mod etc;
 mod io;
@@ -27,14 +27,9 @@ use web_view::{Content, WVResult, WebView};
 #[folder = "resources/"]
 struct Asset;
 
-fn main() -> Result<(), BootstrapError> {
-    let caption = "Rainway Bootstrapper Error";
-    let _guard = sentry::init(env!("SENTRY_DNS"));
-    sentry::integrations::panic::register_panic_handler();
-    if !cfg!(debug_assertions) && is_compiled_for_64_bit() {
-        panic!("Build against i686-pc-windows-msvc for production releases.")
-    }
-    if let Err(e) = error_on_duplicate_session() {
+fn run() -> Result<(), BootstrapError> {
+     let caption = "Rainway Bootstrapper Error";
+     if let Err(e) = error_on_duplicate_session() {
         return Err(e);
     }
 
@@ -110,12 +105,23 @@ fn main() -> Result<(), BootstrapError> {
         .title("Rainway Boostrapper")
         .content(Content::Html(html))
         .size(800, 600)
-        .user_data(0)
         .resizable(false)
         .invoke_handler(|_webview, arg| handler(_webview, arg, &update))
         .build()?;
 
     webview.run()?;
+    Ok(())
+}
+
+fn main() -> Result<(), BootstrapError> {
+    let _guard = sentry::init(env!("SENTRY_DNS"));
+    sentry::integrations::panic::register_panic_handler();
+    if !cfg!(debug_assertions) && is_compiled_for_64_bit() {
+        panic!("Build against i686-pc-windows-msvc for production releases.")
+    }
+    if let Err(e) = run() {
+        panic!("{}", e);
+    }
     Ok(())
 }
 
