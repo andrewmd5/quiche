@@ -27,8 +27,23 @@ use web_view::{Content, WVResult, WebView};
 #[folder = "resources/"]
 struct Asset;
 
+
+const CAPTION: &str = "Rainway Bootstrapper Error";
+
+fn main() -> Result<(), BootstrapError> {
+    let _guard = sentry::init(env!("SENTRY_DNS"));
+    sentry::integrations::panic::register_panic_handler();
+    if !cfg!(debug_assertions) && is_compiled_for_64_bit() {
+        panic!("Build against i686-pc-windows-msvc for production releases.")
+    }
+    if let Err(e) = run() {
+        show_error(CAPTION, format!("{}",  BootstrapError::Generic));
+        panic!("{}", e);
+    }
+    Ok(())
+}
+
 fn run() -> Result<(), BootstrapError> {
-     let caption = "Rainway Bootstrapper Error";
      if let Err(e) = error_on_duplicate_session() {
         return Err(e);
     }
@@ -38,7 +53,7 @@ fn run() -> Result<(), BootstrapError> {
     let rainway_installed = match is_installed() {
         Ok(i) => i,
         Err(e) => {
-            show_error(caption, format!("{}", e));
+            show_error(CAPTION, format!("{}", e));
             sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
             return Err(e);
         }
@@ -55,12 +70,12 @@ fn run() -> Result<(), BootstrapError> {
             Ok(go) => go,
             Err(e) => match e {
                 BootstrapError::NeedWindowsMediaPack(_) => {
-                    show_error_with_url(caption, format!("{}", e), env!("MEDIA_PACK_URL"));
+                    show_error_with_url(CAPTION, format!("{}", e), env!("MEDIA_PACK_URL"));
                     sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
                     return Err(e);
                 }
                 _ => {
-                    show_error(caption, format!("{}", e));
+                    show_error(CAPTION, format!("{}", e));
                     sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
                     return Err(e);
                 }
@@ -77,7 +92,7 @@ fn run() -> Result<(), BootstrapError> {
                 return Ok(());
             } else {
                 let e = BootstrapError::ReleaseLookupFailed;
-                show_error(caption, format!("{}", e));
+                show_error(CAPTION, format!("{}", e));
                 return Err(e);
             }
         }
@@ -110,18 +125,6 @@ fn run() -> Result<(), BootstrapError> {
         .build()?;
 
     webview.run()?;
-    Ok(())
-}
-
-fn main() -> Result<(), BootstrapError> {
-    let _guard = sentry::init(env!("SENTRY_DNS"));
-    sentry::integrations::panic::register_panic_handler();
-    if !cfg!(debug_assertions) && is_compiled_for_64_bit() {
-        panic!("Build against i686-pc-windows-msvc for production releases.")
-    }
-    if let Err(e) = run() {
-        panic!("{}", e);
-    }
     Ok(())
 }
 

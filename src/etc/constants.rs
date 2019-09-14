@@ -22,6 +22,7 @@ pub enum BootstrapError {
     JsonParseFailure,
     BootstrapperExist,
     SignatureMismatch,
+     Generic,
     RemoteFileMissing(String),
     RemoteFileEmpty(String),
     InstallationFailed(String),
@@ -34,6 +35,7 @@ pub enum BootstrapError {
 impl fmt::Display for BootstrapError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
+            BootstrapError::Generic => write!(f, "An issue was encountered configuring Rainway."),
             BootstrapError::ElevationRequired => write!(f, "Please run the Rainway Boostrapper as Administrator."),
             BootstrapError::DismFailed(ref s) => write!(f, "DISM failed to launch: {0}", s),
             BootstrapError::ServiceConnectionFailure => write!(f, "Failed to connect to the system service manager."),
