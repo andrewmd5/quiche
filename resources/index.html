@@ -53,7 +53,7 @@
             document.getElementById('ticks').innerHTML = 'Rainway Installed/Updated! Closing...';
             setTimeout(
                 function () {
-                    external.invoke('launch')
+                    external.invoke('exit')
                 }, 2500);
 
         }
@@ -61,12 +61,6 @@
             document.getElementById('ticks').innerHTML = e;
         }
 
-        function updateTicks(n) {
-            document.getElementById('ticks').innerHTML = 'ticks ' + n;
-        }
-        function test(n) {
-            document.getElementById('ticks').innerHTML = 'ticks ' + n;
-        }
     </script>
 
     <div id="myProgress">

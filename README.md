@@ -20,6 +20,26 @@ By using a bootstrapper we also:
 - It's fast. 
 - I like Rust. 
 
+
+
 # Building
 
-You should always build with a target of `i686-pc-windows-msvc` and to produce a small binary for production use `cargo build --target=i686-pc-windows-msvc --release`. While Rainway only supports x64 systems, we need to be able to present errors on x32 host which is why we targeted i686.
+1. [Install Rust](https://www.rust-lang.org/tools/install)
+2. Run `rustup install stable-i686-pc-windows-msvc`
+3. Pull this repo
+4. Run `cargo build`
+
+To produce a small binary for production use `cargo build --target=i686-pc-windows-msvc --release`. While Rainway only supports x64 systems, we need to be able to present errors on x32 host which is why we targeted i686.
+
+# Running
+
+1. Setup the dummy release server, see the README [here](/dummy_server/README.MD)
+2. Run `cargo run` as Administrator
+
+The UI is loaded from the [index.html](/resources/index.html) resource file. Please ensure all your assets are inlined and not remote HTTP calls are made, the UI should function offline and be small. 
+
+
+# Callbacks
+
+The Rust code will perform actions and post results back to hardcoded callbacks. These callbacks consist of a completion, which signals the task finished succesfully, or a failure which contains an error message. Downloading has an extra callback for progress.  
+
