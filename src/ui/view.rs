@@ -31,7 +31,15 @@ pub fn apply_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpd
         webview,
         move || match update_type {
             UpdateType::Install => install(temp_file),
-            _ => apply(temp_file, version),
+            _ => {
+                //TODO escape strings
+                 let results = apply(temp_file, version).map_err(|err| format!("{}", err)).map(|output| format!("'{}'", output));
+                 match results {
+                     Ok(g) => println!("{}", g.to_string()),
+                     Err(e) =>  println!("{}", e.to_string())
+                 }
+                 Ok(String::default())
+            },
         },
         update_complete.to_string(),
         error_callback.to_string(),
