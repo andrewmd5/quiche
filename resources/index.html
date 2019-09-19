@@ -212,6 +212,15 @@
         }
 
 
+        
+    
+        console.log = function (s) { window.external.invoke("log|" + s) }
+        console.warn = function (s) { window.external.invoke("log|" + s) }
+        console.error = function (s) {window.external.invoke("log|" + s) }
+
+        console.log("hello world")
+
+
         function domReady(cb) {
             if (document.readyState === "loading") {
                 document.addEventListener('DOMContentLoaded', cb);
@@ -313,7 +322,7 @@
         }
 
         function updateFailed(e) {
-            ticks.innerHTML = e;
+            console.error('update failed: ' + e)
         }
     </script>
 </head>

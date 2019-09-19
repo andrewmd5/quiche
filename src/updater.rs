@@ -258,7 +258,7 @@ where
     download_path.push(output_file);
     let results = download_file(local_arc, &url, &download_path)
         .map_err(|err| format!("{}", err))
-        .map(|output| format!("'{}'", output));
+        .map(|output| format!("{}", output));
     let _res = child.join();
     results
 }

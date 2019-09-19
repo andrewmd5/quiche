@@ -131,7 +131,14 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         "exit" => {
             std::process::exit(0);
         }
-        _ => unimplemented!(),
+        _ => {
+            if arg.contains("log|") {
+                println!("[Javascript] {}", arg.split('|').collect::<Vec<&str>>()[1]);
+            } else {
+                unimplemented!()
+            }
+        },
+
     }
     Ok(())
 }
