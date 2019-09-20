@@ -183,6 +183,7 @@
             width: 100%;
             height: 10px;
             border-radius: 5px;
+            position: relative;
             background-color: rgba(244, 245, 252, 0.15);
         }
 
@@ -190,7 +191,27 @@
             width: 2%;
             height: 100%;
             border-radius: 5px;
-            background: linear-gradient(to right, #0DFF67 0px, #48BB79 300px);
+            background: linear-gradient(to right, #0DFF67 0px, #48BB79 520px);
+        }
+
+        @keyframes scroll {
+            from { transform: translateX(-50%) }
+            to { transform: translateX(0px) }
+        }
+
+        .scroller {
+            visibility: hidden;
+            position: absolute;
+            top: 0px;
+            left: 0px;
+            width: 200%;
+            height: 100%;
+            background: repeating-linear-gradient(-50deg, transparent 0px, transparent 8px, rgba(10, 10, 29, 0.15) 8px, rgba(10, 10, 29, 0.15) 16px);
+            animation-name: scroll;
+            animation-duration: 7s;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            animation-play-state: running;
         }
     </style>
 
@@ -201,7 +222,10 @@
         let progressDescriptionText
         let progressDescriptionQuantify
         let progressBarFilled
+        let progressBarScroller
         let curr
+        let downloadSize
+        let downloadVersion
         const debug = false
         const self = this
         const steps = {
@@ -211,15 +235,9 @@
             'finished': 3,
         }
 
-
-        
-    
         console.log = function (s) { window.external.invoke("log|" + s) }
         console.warn = function (s) { window.external.invoke("log|" + s) }
-        console.error = function (s) {window.external.invoke("log|" + s) }
-
-        console.log("hello world")
-
+        console.error = function (s) { window.external.invoke("log|" + s) }
 
         function domReady(cb) {
             if (document.readyState === "loading") {
@@ -237,10 +255,15 @@
             progressDescriptionText = document.querySelector('.progress-description .text')
             progressDescriptionQuantify = document.querySelector('.progress-description .quantify')
             progressBarFilled = document.querySelector('.progress-bar .filled')
+            progressBarScroller =  document.querySelector('.progress-bar .scroller')
+
+            window.onerror = function(e) {
+                console.log(String(e))
+                return true;
+            }
 
             if (debug) {
                 mockSteps()
-                // setCurrentStep('downloading')
             } else {
                 setTimeout(function() {
                     setCurrentStep('downloading')
@@ -252,6 +275,7 @@
         function mockSteps() {
             log('mocking steps')
             setTimeout(function() { setCurrentStep('downloading') }, 1000)
+            setTimeout(function() { progressBarScroller.style.visibility = 'visible' }, 1000)
             setTimeout(function() { setCurrentStep('verifying') }, 2000)
             setTimeout(function() { setCurrentStep('installing') }, 3000)
             setTimeout(function() { setCurrentStep('finished') }, 4000)
@@ -280,25 +304,24 @@
 
         domReady(init.bind(this))
 
-        let downloadSize
         function downloadProgress(v, total, downloaded) {
             if (!downloadSize) downloadSize = Math.ceil(total / 1e6)
-            progressDescriptionText.innerHTML = 'Downloading Dashboard v' + v
+            if (!downloadVersion) downloadVersion = v
+            progressDescriptionText.innerHTML = 'Downloading Dashboard v' + downloadVersion
             progressDescriptionQuantify.innerHTML = (downloaded / 1e6).toFixed(1) + ' / ' + downloadSize + ' MB'
             const percent = Math.max((downloaded / total) * 100, 2)
             progressBarFilled.style.width = ''+percent+'%'
         }
 
         function downloadFailed(e) {
-
+            console.log('download failed: ' + e)
         }
 
         function downloadComplete(e) {
             progressBarFilled.style.width = '100%'
-            progressDescriptionQuantify.style.color = '#25C85E'
-            progressDescriptionQuantify.innerHTML = downloadSize + ' / ' + downloadSize + ' MB'
-            progressDescriptionText.style.color = '#25C85E'
-            progressDescriptionText.innerHTML = 'Download Complete'
+            progressDescriptionQuantify.style.display = 'none'
+            progressDescriptionText.innerHTML = 'Verifying Dashboard v' + downloadVersion
+            progressBarScroller.style.visibility = 'visible'
 
             setCurrentStep.call(self, 'verifying')
             external.invoke('verify')
@@ -307,14 +330,17 @@
         function verificationComplete(e) {
             setCurrentStep.call(self, 'installing')
             external.invoke('apply')
+            progressDescriptionText.innerHTML = 'Installing Dashboard v' + downloadVersion
         }
 
         function verificationFailed(e) {
-
+            console.log('verification failed: ' + e)
         }
 
         function updateComplete(e) {
+            console.log(e)
             setCurrentStep.call(self, 'finished')
+            progressDescriptionText.innerHTML = 'Dashboard v' + downloadVersion + ' installed!';
             setTimeout(
                 function () {
                     external.invoke('exit')
@@ -376,6 +402,7 @@
 
             <div class="progress-bar">
                 <div class="filled"></div>
+                <div class="scroller"></div>
             </div>
         </div>
     </div>
