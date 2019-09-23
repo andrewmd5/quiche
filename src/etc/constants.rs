@@ -22,7 +22,7 @@ pub enum BootstrapError {
     SignatureMismatch,
     RemoteFileMissing(String),
     RemoteFileEmpty(String),
-    InstallationFailed(String), 
+    InstallationFailed(String),
     RequestError(reqwest::Error),
     IOError(std::io::Error),
     WebView(web_view::Error),

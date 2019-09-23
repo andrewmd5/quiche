@@ -8,8 +8,8 @@ use fs_extra::dir::{copy, move_dir, CopyOptions};
 use serde::Deserialize;
 
 use std::{
-    fs::{remove_dir_all, read_dir},
-    env::{temp_dir},
+    env::temp_dir,
+    fs::{read_dir, remove_dir_all},
     sync::{Arc, RwLock},
     thread,
     time::Duration,
@@ -374,8 +374,8 @@ pub fn apply(package_name: String, version: String) -> Result<String, String> {
 /// The bootstrapper will not launch Rainway after this.
 /// The installer should be configured to launch post-install.
 pub fn install(installer_name: String) -> Result<String, String> {
+    use std::os::windows::process::CommandExt;
     use std::process::Command;
-    use std::os::windows::process::{CommandExt};
     let mut download_path = temp_dir();
     download_path.push(installer_name);
     Command::new(download_path)

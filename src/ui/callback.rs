@@ -17,7 +17,6 @@ pub fn run_async<T: 'static, F: FnOnce() -> Result<String, String> + Send + 'sta
     });
 }
 
-
 /// Escape a string to pass it into JavaScript.
 fn escape_string(arg: String) -> String {
     let mut escaped_string = String::default();
@@ -30,12 +29,10 @@ fn escape_string(arg: String) -> String {
             '\r' => escaped_string.push_str("\\r"),
             '\'' => escaped_string.push_str("\\'"),
             '\t' => escaped_string.push_str("\\t"),
-            '\u{2028}' => escaped_string.push_str("\\u2028"),
-            '\u{2029}' => escaped_string.push_str("\\u2029"),
             _ => {
                 let i = c as i32;
                 if i < 32 || i > 127 {
-                    escaped_string.push_str(format!("\\u{:04}", i).as_str());
+                    escaped_string.push_str(format!("\\u{:04x}", i).as_str());
                 } else {
                     escaped_string.push_str(c.to_string().as_str());
                 }

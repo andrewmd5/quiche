@@ -5,6 +5,14 @@ authors = ["Andrew Sampson <andrew@rainway.com>"]
 edition = "2018"
 build = "build.rs"
 
+[[bin]]
+name = "quiche-cli"
+path = "src/cli.rs"
+
+[[bin]]
+name = "RainwayBootstrapper"
+path = "src/main.rs"
+
 [package.rainway]
 release_url = "http://local.vg:8080/Releases.toml"
 media_pack_url = "https://www.microsoft.com/en-us/software-download/mediafeaturepack"
@@ -21,6 +29,8 @@ LegalCopyright = "Copyright © 2019"
 winres = "0.1"
 
 [dependencies]
+ansi_term = "0.12"
+clap = "2.33.0"
 windows-service = "0.2.0"
 zip = "0.5"
 fs_extra = { git = "https://github.com/webdesus/fs_extra.git" }

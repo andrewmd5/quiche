@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 //#![windows_subsystem = "windows"]
 
+
 mod etc;
 mod io;
 mod net;
@@ -137,8 +138,7 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
             } else {
                 unimplemented!()
             }
-        },
-
+        }
     }
     Ok(())
 }
