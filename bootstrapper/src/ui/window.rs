@@ -1,4 +1,4 @@
-use std::ptr;
+
 
 /// makes the applications WebView DPI aware.
 pub fn set_dpi_aware() {

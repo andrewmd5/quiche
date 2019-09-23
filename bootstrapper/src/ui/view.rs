@@ -1,6 +1,6 @@
 use crate::rainway::{launch_rainway};
 use crate::ui::callback::run_async;
-use quiche::etc::constants::BootstrapError;
+
 use quiche::updater::{apply, download_with_callback, install, verify, ActiveUpdate, UpdateType};
 use web_view::WebView;
 

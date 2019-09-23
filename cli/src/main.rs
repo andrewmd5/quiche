@@ -1,6 +1,6 @@
 use ansi_term::Colour::Green;
-use clap::{App, Arg, SubCommand};
-use std::io;
+use clap::{App, Arg};
+
 use quiche::updater::ReleaseBranch;
 
 fn main() {
