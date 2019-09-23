@@ -1,5 +1,5 @@
 #![warn(rust_2018_idioms)]
-//#![windows_subsystem = "windows"]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod rainway;
 mod ui;
@@ -13,7 +13,7 @@ use rainway::{
 use quiche::updater::{ActiveUpdate, UpdateType, get_branch};
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
-use ui::window::set_dpi_aware;
+use ui::window::{set_dpi_aware};
 
 use rust_embed::RustEmbed;
 use web_view::{Content, WVResult, WebView};
