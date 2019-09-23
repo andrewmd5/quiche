@@ -1,0 +1,23 @@
+[package]
+name = "quiche"
+version = "0.1.0"
+authors = ["Andrew Sampson <andrew@rainway.io>"]
+edition = "2018"
+build = "build.rs"
+
+[package.rainway]
+release_url = "http://local.vg:8080/Releases.toml"
+
+[dependencies]
+sentry = { version = "0.12.0", features = ["with_device_info", "with_panic", "with_rust_info"] } 
+windows-service = "0.2.0"
+zip = "0.5"
+fs_extra = { git = "https://github.com/webdesus/fs_extra.git" }
+version-compare = "0.0.9"
+toml = "0.5.3"
+sha2 = "0.8.0"
+serde = { version = "1.0", features = ["derive"] }
+reqwest = "0.9.19"
+winreg = "0.6"
+regex = "1"
+

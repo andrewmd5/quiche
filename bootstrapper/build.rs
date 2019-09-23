@@ -27,10 +27,6 @@ fn main() {
         _ => (),
     }
     println!(
-        "cargo:rustc-env=RAINWAY_RELEASE_URL={}",
-        find_cargo_field("release_url")
-    );
-    println!(
         "cargo:rustc-env=RAINWAY_SERVICE={}",
         find_cargo_field("service_name")
     );
@@ -43,7 +39,7 @@ fn main() {
         find_cargo_field("sentry_dns")
     );
     let mut res = winres::WindowsResource::new();
-    res.set_icon("resources/ProgramIcon.ico");
+    res.set_icon("../resources/ProgramIcon.ico");
     res.set_manifest_file("manifest.xml");
     res.compile().unwrap();
 }

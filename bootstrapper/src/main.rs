@@ -1,23 +1,19 @@
 #![warn(rust_2018_idioms)]
-//#![windows_subsystem = "windows"]
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod etc;
-mod io;
-mod net;
-mod os;
+mod rainway;
 mod ui;
-mod updater;
-use etc::constants::{is_compiled_for_64_bit, BootstrapError};
-use etc::rainway::check_system_compatibility;
-use etc::rainway::{
-    error_on_duplicate_session, get_config_branch, is_installed, is_outdated,
-    kill_rainway_processes, launch_rainway,
+
+use quiche::etc::constants::{BootstrapError, is_compiled_for_64_bit};
+use rainway::{
+    check_system_compatibility, error_on_duplicate_session, get_config_branch, is_installed, kill_rainway_processes, launch_rainway,
+    get_install_path, get_installed_version
 };
 
+use quiche::updater::{ActiveUpdate, UpdateType, get_branch};
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
-use ui::window::set_dpi_aware;
-use updater::{ActiveUpdate, UpdateType};
+use ui::window::{set_dpi_aware};
 
 use rust_embed::RustEmbed;
 use web_view::{Content, WVResult, WebView};
@@ -62,13 +58,27 @@ fn run() -> Result<(), BootstrapError> {
         update.update_type = UpdateType::Install;
     } else {
         update.update_type = UpdateType::Patch;
+        update.current_version = match get_installed_version() {
+            Some(v) => v,
+            None => {
+                launch_rainway();
+                return Err(BootstrapError::LocalVersionMissing)
+            },
+        };
+        update.install_path = match get_install_path() {
+            Some(p) => p,
+            None => {
+                launch_rainway();
+                return Err(BootstrapError::InstallPathMissing)
+            },
+        };
     }
 
     if !rainway_installed {
         check_system_compatibility()?;
     }
     //regardless of whether we need to update or install, we need the latest branch.
-    match updater::get_branch(get_config_branch()) {
+    match get_branch(get_config_branch()) {
         Some(b) => update.branch = b,
         None => {
             if rainway_installed {
@@ -83,11 +93,8 @@ fn run() -> Result<(), BootstrapError> {
     update.temp_name = format!("{}{}", update.get_hash(), update.get_ext());
     //check if Rainway requires an update if it's installed
     if rainway_installed {
-        let outdated = match is_outdated(&update.branch.version, update.get_package_files()) {
-            Some(o) => o,
-            None => false,
-        };
-        if !outdated {
+        let valid = update.validate();
+        if valid {
             println!("Rainway is not outdated, starting.");
             launch_rainway();
             return Ok(());
@@ -99,7 +106,7 @@ fn run() -> Result<(), BootstrapError> {
     let index = Asset::get("index.html").unwrap();
     let html = std::str::from_utf8(&index).unwrap();
 
-    let webview = web_view::builder()
+    let webview = match web_view::builder()
         .title("Rainway Boostrapper")
         .content(Content::Html(html))
         .size(600, 380)
@@ -107,10 +114,16 @@ fn run() -> Result<(), BootstrapError> {
         .user_data(0)
         .resizable(false)
         .invoke_handler(|_webview, arg| handler(_webview, arg, &update))
-        .build()?;
+        .build() {
+            Ok(v) => v,
+            Err(e) => return Err(BootstrapError::WebView(e.to_string()))
+        };
 
-    webview.run()?;
-    Ok(())
+    match webview.run() {
+        Ok(_v) => return Ok(()),
+        Err(e) => return Err(BootstrapError::WebView(e.to_string()))
+    };
+    
 }
 
 /// handles WebView external function calls
@@ -137,8 +150,7 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
             } else {
                 unimplemented!()
             }
-        },
-
+        }
     }
     Ok(())
 }
