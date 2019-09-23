@@ -15,6 +15,8 @@ pub enum BootstrapError {
     RegistryKeyNotFound(String),
     RegistryValueNotFound(String),
     HttpFailed(u16, String),
+    LocalVersionMissing,
+    InstallPathMissing,
     ReleaseLookupFailed,
     VersionCheckFailed(String, String),
     TomlParseFailure(String, String),
@@ -25,7 +27,7 @@ pub enum BootstrapError {
     InstallationFailed(String),
     RequestError(reqwest::Error),
     IOError(std::io::Error),
-    WebView(web_view::Error),
+    WebView(String),
 }
 
 #[allow(non_snake_case)]
@@ -54,10 +56,13 @@ impl fmt::Display for BootstrapError {
             BootstrapError::IOError(ref e) => write!(f, "An unknown issue was encountered: {0}", e),
             BootstrapError::BootstrapperExist => write!(f, "Another instance of the Rainway Bootstrapper is already running."),
             BootstrapError::WebView(ref e) => write!(f, "An unknown UI issue was encountered: {0}", e),
+            BootstrapError::LocalVersionMissing => write!(f, "Unable to locate the version of the currently intalled branch."),
+            BootstrapError::InstallPathMissing => write!(f, "Unable to locate the installation path of the currently intalled branch."),
             BootstrapError::ReleaseLookupFailed => write!(f, "Looks like something went wrong. We were unable to determine the latest Rainway release. Please exit and try again."),
         }
     }
 }
+
 
 impl From<String> for ReleaseBranch {
     fn from(branch: String) -> Self {
@@ -70,6 +75,12 @@ impl From<String> for ReleaseBranch {
     }
 }
 
+impl From<&str> for ReleaseBranch {
+    fn from(branch: &str) -> Self {
+        ReleaseBranch::from(branch.to_string())
+    }
+}
+
 impl From<reqwest::Error> for BootstrapError {
     fn from(error: reqwest::Error) -> Self {
         BootstrapError::RequestError(error)
@@ -79,12 +90,6 @@ impl From<reqwest::Error> for BootstrapError {
 impl From<std::io::Error> for BootstrapError {
     fn from(error: std::io::Error) -> Self {
         BootstrapError::IOError(error)
-    }
-}
-
-impl From<web_view::Error> for BootstrapError {
-    fn from(error: web_view::Error) -> Self {
-        BootstrapError::WebView(error)
     }
 }
 

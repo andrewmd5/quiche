@@ -1,6 +1,7 @@
-use crate::etc::rainway::launch_rainway;
+use crate::rainway::{launch_rainway};
 use crate::ui::callback::run_async;
-use crate::updater::{apply, download_with_callback, install, verify, ActiveUpdate, UpdateType};
+use quiche::etc::constants::BootstrapError;
+use quiche::updater::{apply, download_with_callback, install, verify, ActiveUpdate, UpdateType};
 use web_view::WebView;
 
 pub fn verify_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
@@ -26,12 +27,15 @@ pub fn apply_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpd
     let error_callback = "updateFailed";
     let temp_file = update.get_temp_name();
     let version = update.get_version();
+    let install_path = update.install_path.clone();
     let update_type = update.update_type.clone();
     run_async(
         webview,
         move || match update_type {
             UpdateType::Install => install(temp_file),
-            _ => apply(temp_file, version),
+            _ => {
+                apply(install_path, temp_file, version)
+            }
         },
         update_complete.to_string(),
         error_callback.to_string(),

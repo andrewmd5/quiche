@@ -170,35 +170,3 @@ pub fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
     }
     Ok(apps)
 }
-
-/// opens a URL in the systems default web browser.
-pub fn open_url(url: &'static str) {
-    use std::ptr;
-    use widestring::U16CString;
-    use winapi::shared::winerror::SUCCEEDED;
-    use winapi::um::combaseapi::{CoInitializeEx, CoUninitialize};
-    use winapi::um::objbase::{COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE};
-    use winapi::um::shellapi::ShellExecuteW;
-    use winapi::um::winuser::SW_SHOWNORMAL;
-
-    static OPEN: &[u16] = &['o' as u16, 'p' as u16, 'e' as u16, 'n' as u16, 0x0000];
-    let url = U16CString::from_str(url).unwrap();
-    unsafe {
-        let coinitializeex_result = CoInitializeEx(
-            ptr::null_mut(),
-            COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE,
-        );
-        let code = ShellExecuteW(
-            ptr::null_mut(),
-            OPEN.as_ptr(),
-            url.as_ptr(),
-            ptr::null(),
-            ptr::null(),
-            SW_SHOWNORMAL,
-        ) as usize as i32;
-        if SUCCEEDED(coinitializeex_result) {
-            CoUninitialize();
-        }
-        code
-    };
-}
