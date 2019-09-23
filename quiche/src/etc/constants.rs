@@ -63,7 +63,6 @@ impl fmt::Display for BootstrapError {
     }
 }
 
-
 impl From<String> for ReleaseBranch {
     fn from(branch: String) -> Self {
         match branch.to_lowercase().trim() {

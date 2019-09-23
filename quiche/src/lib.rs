@@ -11,7 +11,7 @@ pub mod updater {
     use crate::io::zip::unzip;
     use crate::net::http::{download_file, download_toml};
     use fs_extra::dir::{copy, move_dir, CopyOptions};
-    use serde::Deserialize;
+    use serde::{Deserialize, Serialize};
     use version_compare::Version;
 
     use std::{
@@ -138,15 +138,18 @@ pub mod updater {
                     }
                 }
             }
-             sentry::capture_message(
-        format!(
-            "{}",
-            BootstrapError::VersionCheckFailed(self.branch.version.to_string(), self.current_version.clone())
-        )
-        .as_str(),
-        sentry::Level::Error,
-    );
-    return false;
+            sentry::capture_message(
+                format!(
+                    "{}",
+                    BootstrapError::VersionCheckFailed(
+                        self.branch.version.to_string(),
+                        self.current_version.clone()
+                    )
+                )
+                .as_str(),
+                sentry::Level::Error,
+            );
+            return false;
         }
     }
 
@@ -158,7 +161,7 @@ pub mod updater {
         pub faulted: bool,
     }
 
-    #[derive(Deserialize, Default)]
+    #[derive(Serialize, Deserialize, Default)]
     pub struct Branch {
         /// The version of the active branch.
         pub version: String,
@@ -168,7 +171,7 @@ pub mod updater {
         pub manifest: Option<Manifest>,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Serialize, Deserialize)]
     pub struct Releases {
         /// The stable branch, used by default.
         pub stable: Branch,
@@ -180,7 +183,13 @@ pub mod updater {
         pub nightly: Branch,
     }
 
-    #[derive(Deserialize)]
+    impl Releases {
+        pub fn to_string(&self) -> String {
+            toml::to_string(&self).unwrap()
+        }
+    }
+
+    #[derive(Serialize, Deserialize)]
     pub struct Manifest {
         /// The update package.
         pub package: Package,
@@ -188,7 +197,7 @@ pub mod updater {
         pub installer: Installer,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Serialize, Deserialize)]
     pub struct Installer {
         /// The URL of the actual full installer.
         pub url: String,
@@ -196,7 +205,7 @@ pub mod updater {
         pub hash: String,
     }
 
-    #[derive(Deserialize)]
+    #[derive(Serialize, Deserialize)]
     pub struct Package {
         /// The URL to the zip package containing all the new files.
         pub url: String,
@@ -207,7 +216,7 @@ pub mod updater {
     }
 
     /// fetches all the available releases for each branch.
-    fn get_releases() -> Option<Releases> {
+    pub fn get_releases() -> Option<Releases> {
         match download_toml::<Releases>(env!("RAINWAY_RELEASE_URL")) {
             Ok(r) => return Some(r),
             Err(e) => {
@@ -294,7 +303,7 @@ pub mod updater {
         });
         let mut download_path = temp_dir();
         download_path.push(output_file);
-    
+
         let results = download_file(local_arc, &url, &download_path)
             .map_err(|err| format!("{}", err))
             .map(|output| format!("{}", output));

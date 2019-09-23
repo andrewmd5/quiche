@@ -18,6 +18,13 @@ pub fn dir_contains_all_files(files: Vec<String>, input: &String) -> bool {
     true
 }
 
+pub fn get_total_files(input: String) -> Option<u64> {
+    if let Some(files) = get_dir_files(&input) {
+        return Some(files.len() as u64);
+    }
+    None
+}
+
 /// returns a vector of all the files in a folder.
 pub fn get_dir_files(input: &String) -> Option<Vec<String>> {
     let input_path = Path::new(input);

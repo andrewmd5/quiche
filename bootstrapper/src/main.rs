@@ -4,16 +4,16 @@
 mod rainway;
 mod ui;
 
-use quiche::etc::constants::{BootstrapError, is_compiled_for_64_bit};
+use quiche::etc::constants::{is_compiled_for_64_bit, BootstrapError};
 use rainway::{
-    check_system_compatibility, error_on_duplicate_session, get_config_branch, is_installed, kill_rainway_processes, launch_rainway,
-    get_install_path, get_installed_version
+    check_system_compatibility, error_on_duplicate_session, get_config_branch, get_install_path,
+    get_installed_version, is_installed, kill_rainway_processes, launch_rainway,
 };
 
-use quiche::updater::{ActiveUpdate, UpdateType, get_branch};
+use quiche::updater::{get_branch, ActiveUpdate, UpdateType};
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
-use ui::window::{set_dpi_aware};
+use ui::window::set_dpi_aware;
 
 use rust_embed::RustEmbed;
 use web_view::{Content, WVResult, WebView};
@@ -62,15 +62,15 @@ fn run() -> Result<(), BootstrapError> {
             Some(v) => v,
             None => {
                 launch_rainway();
-                return Err(BootstrapError::LocalVersionMissing)
-            },
+                return Err(BootstrapError::LocalVersionMissing);
+            }
         };
         update.install_path = match get_install_path() {
             Some(p) => p,
             None => {
                 launch_rainway();
-                return Err(BootstrapError::InstallPathMissing)
-            },
+                return Err(BootstrapError::InstallPathMissing);
+            }
         };
     }
 
@@ -114,16 +114,16 @@ fn run() -> Result<(), BootstrapError> {
         .user_data(0)
         .resizable(false)
         .invoke_handler(|_webview, arg| handler(_webview, arg, &update))
-        .build() {
-            Ok(v) => v,
-            Err(e) => return Err(BootstrapError::WebView(e.to_string()))
-        };
+        .build()
+    {
+        Ok(v) => v,
+        Err(e) => return Err(BootstrapError::WebView(e.to_string())),
+    };
 
     match webview.run() {
         Ok(_v) => return Ok(()),
-        Err(e) => return Err(BootstrapError::WebView(e.to_string()))
+        Err(e) => return Err(BootstrapError::WebView(e.to_string())),
     };
-    
 }
 
 /// handles WebView external function calls

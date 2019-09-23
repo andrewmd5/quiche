@@ -1,4 +1,4 @@
-use crate::rainway::{launch_rainway};
+use crate::rainway::launch_rainway;
 use crate::ui::callback::run_async;
 
 use quiche::updater::{apply, download_with_callback, install, verify, ActiveUpdate, UpdateType};
@@ -33,9 +33,7 @@ pub fn apply_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpd
         webview,
         move || match update_type {
             UpdateType::Install => install(temp_file),
-            _ => {
-                apply(install_path, temp_file, version)
-            }
+            _ => apply(install_path, temp_file, version),
         },
         update_complete.to_string(),
         error_callback.to_string(),

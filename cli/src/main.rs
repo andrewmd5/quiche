@@ -1,10 +1,13 @@
-use ansi_term::Colour::Green;
 use clap::{App, Arg};
+use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
+use quiche::io::zip::zip_with_progress;
+use quiche::io::disk::get_total_files;
+use quiche::updater::{get_releases, ReleaseBranch};
+use console::{style};
 
-use quiche::updater::ReleaseBranch;
 
 fn main() {
-    println!("{}", Green.paint(LOGO));
+    println!("{}", style(LOGO).cyan());
 
     let matches = App::new("Quiche CLI")
         .version("1.0")
@@ -26,16 +29,49 @@ fn main() {
                 .help("Defines the branch quiche will be working work"),
         )
         .arg(
-            Arg::with_name("v")
+            Arg::with_name("version")
                 .short("v")
-                .multiple(true)
-                .help("Sets the level of verbosity"),
+                .value_name("VERSION")
+                .required(true)
+                .help("The version you wish to create or fetch"),
         )
         .get_matches();
 
     let branch = ReleaseBranch::from(matches.value_of("branch").unwrap_or(""));
 
-    println!("{}", branch);
+    let releases = match get_releases() {
+        Some(r) => r,
+        None => panic!("cant"),
+    };
+
+    let test_dir =  String::from("E:\\UpdateTest\\InstalledFolder\\");
+    let file_count = get_total_files(test_dir.clone()).unwrap();
+
+    
+
+    let bar = ProgressBar::new_spinner();
+     bar.enable_steady_tick(200);
+     bar.set_style(
+        ProgressStyle::default_spinner()
+            .tick_chars("/|\\- ")
+            .template("{spinner:.dim.bold} Packaging: {wide_msg}"),
+    );
+    let func_test = |file: String| {
+        bar.set_message(format!("{}", file).as_str());
+        bar.tick();
+    };
+
+  
+
+    match zip_with_progress(
+       test_dir,
+        String::from("E:\\UpdateTest\\test.zip"),
+        func_test) 
+    {
+        Ok(f) => println!("{}", f),
+        Err(e) => println!("{}", e),
+    };
+    bar.finish_with_message("Done!");
 }
 
 const LOGO: &str = r#"
