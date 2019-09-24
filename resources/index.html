@@ -118,6 +118,14 @@
             background-color: #25C85E;
         }
 
+        .step-dot--failed {
+            background-color: #F34331;
+        }
+
+        .step-dot--failed:after {
+            border-color: #F34331;
+        }
+
         .step-dash {
             margin: 6px;
             height: 2px;
@@ -127,6 +135,10 @@
 
         .step-dash--complete {
             background-color: #25C85E;
+        }
+
+        .step-dash--failed {
+            background-color: #F34331;
         }
 
         .step-labels-wrapper {
@@ -150,6 +162,10 @@
 
         .step-label--complete {
             color: #25C85E;
+        }
+
+        .step-label--failed {
+            color: #F34331;
         }
 
         .progress-wrapper {
@@ -194,6 +210,46 @@
             background: linear-gradient(to right, #0DFF67 0px, #48BB79 520px);
         }
 
+        .filled--failed {
+            background: linear-gradient(to right, #FF0D0D 0px, #BB7148 520px);
+        }
+
+        .failure-controls-wrapper {
+            font-size: 14px;
+            font-weight: bold;
+            font-family: 'Lato';
+            display: none;
+        }
+
+        .failure-controls-wrapper a {
+            text-decoration: none;
+        }
+
+        .failure-controls-wrapper .retry {
+            color: #3F8BDE;
+        }
+
+        .failure-controls-wrapper .retry:hover {
+            color: rgb(63, 158, 222);
+        }
+
+        .failure-controls-wrapper .retry:active {
+            color: #3F8BDE;
+        }
+
+        .failure-controls-wrapper .cancel {
+            margin-left: 30px;
+            color: rgba(244, 245, 252, .5);
+        }
+
+        .failure-controls-wrapper .cancel:hover {
+            color: rgba(244, 245, 252, .6);
+        }
+
+        .failure-controls-wrapper .cancel:active {
+            color: rgba(244, 245, 252, .5);
+        }
+
         @keyframes scroll {
             from { transform: translateX(-50%) }
             to { transform: translateX(0px) }
@@ -216,18 +272,49 @@
     </style>
 
     <script type="text/javascript">
+        //  @ts-check
         let stepDots
         let stepDashes
         let stepLabels
+        let progressDescription
         let progressDescriptionText
         let progressDescriptionQuantify
         let progressBarFilled
         let progressBarScroller
+        let failureStateControls
+        let retryButton
+        let cancelButton
         let curr
         let downloadSize
         let downloadVersion
-        const debug = false
-        const self = this
+        const debug = true
+
+
+        /**
+        @type {{
+            downloading: string,
+            verifying: string,
+            installing: string,
+            finished: string,
+            invoke: string,
+        }}
+        **/
+        const slugs = {
+            downloading: 'downloading',
+            verifying: 'verifying',
+            installing: 'installing',
+            finished: 'finished',
+            invoke: 'invoke',
+        }
+
+        /**
+        @type {{
+            downloading: number,
+            verifying: number,
+            installing: number,
+            finished: number,
+        }}
+        **/
         const steps = {
             'downloading': 0,
             'verifying': 1,
@@ -235,9 +322,9 @@
             'finished': 3,
         }
 
-        console.log = function (s) { window.external.invoke("log|" + s) }
-        console.warn = function (s) { window.external.invoke("log|" + s) }
-        console.error = function (s) { window.external.invoke("log|" + s) }
+        console.log = function (s) { window.external[slugs.invoke]("log|" + s) }
+        console.warn = function (s) { window.external[slugs.invoke]("log|" + s) }
+        console.error = function (s) { window.external[slugs.invoke]("log|" + s) }
 
         function domReady(cb) {
             if (document.readyState === "loading") {
@@ -252,10 +339,17 @@
             stepDots = document.getElementsByClassName('step-dot')
             stepLabels = document.getElementsByClassName('step-label')
             stepDashes = document.getElementsByClassName('step-dash')
+            progressDescription = document.querySelector('.progress-wrapper')
             progressDescriptionText = document.querySelector('.progress-description .text')
             progressDescriptionQuantify = document.querySelector('.progress-description .quantify')
             progressBarFilled = document.querySelector('.progress-bar .filled')
-            progressBarScroller =  document.querySelector('.progress-bar .scroller')
+            progressBarScroller = document.querySelector('.progress-bar .scroller')
+            failureStateControls = document.querySelector('.failure-controls-wrapper')
+            retryButton = document.querySelector('.failure-controls-wrapper .retry')
+            cancelButton = document.querySelector('.failure-controls-wrapper .cancel')
+
+            retryButton.addEventListener('click', failureStateRetryCallback)
+            cancelButton.addEventListener('click', failureStateCancelCallback)
 
             window.onerror = function(e) {
                 console.log(String(e))
@@ -263,35 +357,58 @@
             }
 
             if (debug) {
-                mockSteps()
+                // mockSuccess()
+                mockFailure()
             } else {
                 setTimeout(function() {
-                    setCurrentStep('downloading')
-                    external.invoke('download')
+                    setCurrentStep(slugs.downloading)
+                    external[slugs.invoke]('download')
                 }, 1000)
             }
         }
 
-        function mockSteps() {
-            log('mocking steps')
-            setTimeout(function() { setCurrentStep('downloading') }, 1000)
-            setTimeout(function() { progressBarScroller.style.visibility = 'visible' }, 1000)
-            setTimeout(function() { setCurrentStep('verifying') }, 2000)
-            setTimeout(function() { setCurrentStep('installing') }, 3000)
-            setTimeout(function() { setCurrentStep('finished') }, 4000)
+        function mockFailure() {
+            console.log('mocking Failure')
+            setTimeout(function() {
+                setCurrentStep(slugs.downloading)
+                progressBarFilled.style.width = '50%'
+            }, 1000)
+            setTimeout(function() {
+                setCurrentStep(slugs.verifying)
+                progressBarFilled.style.width = '100%'
+                progressBarScroller.style.visiblity = 'visible'
+            }, 2000)
+            setTimeout(function() {
+                setFailureState(slugs.verifying)
+            }, 3000)
         }
 
-        function log() {
-            if (debug) console.log(arguments)
+        function mockSuccess() {
+            console.log('mocking Success')
+            setTimeout(function() {
+                setCurrentStep(slugs.downloading)
+                progressBarFilled.style.width = '50%'
+            }, 1000)
+            setTimeout(function() {
+                setCurrentStep(slugs.verifying)
+                progressBarFilled.style.width = '100%'
+                progressBarScroller.style.visibility = 'visible'
+            }, 2000)
+            setTimeout(function() {
+                setCurrentStep(slugs.installing)
+            }, 3000)
+            setTimeout(function() {
+                setCurrentStep(slugs.finished)
+            }, 4000)
         }
 
         function setCurrentStep(next) {
-            log('currentStep', next)
+            console.log('currentStep', next)
             curr = next
             const currIndex = steps[curr]
             const lastIndex = currIndex - 1
 
-            if (curr !== 'downloading') {
+            if (curr !== slugs.downloading) {
                 stepDots[lastIndex].classList.remove('step-dot--active')
                 stepDots[lastIndex].classList.add('step-dot--complete')
                 stepDashes[lastIndex].classList.add('step-dash--complete')
@@ -300,6 +417,19 @@
 
             stepDots[currIndex].classList.add('step-dot--active')
             stepLabels[currIndex].classList.add('step-label--active')
+        }
+
+        function setFailureState(step) {
+            const capitalized = step.split('')[0].toUpperCase() + step.slice(1)
+            const currIndex = steps[step]
+
+            stepDots[currIndex].classList.add('step-dot--failed')
+            currIndex > 0 && stepDashes[currIndex - 1].classList.add('step-dash--failed')
+            progressBarFilled.classList.add('filled--failed')
+            progressBarScroller.style.animation = undefined
+            progressDescriptionText.innerHTML = capitalized + ' failed...'
+            progressDescriptionQuantify.style.display = 'none'
+            failureStateControls.style.display = 'block'
         }
 
         domReady(init.bind(this))
@@ -315,6 +445,7 @@
 
         function downloadFailed(e) {
             console.log('download failed: ' + e)
+            setFailureState(slugs.downloading)
         }
 
         function downloadComplete(e) {
@@ -323,32 +454,46 @@
             progressDescriptionText.innerHTML = 'Verifying Dashboard v' + downloadVersion
             progressBarScroller.style.visibility = 'visible'
 
-            setCurrentStep.call(self, 'verifying')
-            external.invoke('verify')
+            setCurrentStep.call(this, slugs.verifying)
+            external[slugs.invoke]('verify')
         }
 
         function verificationComplete(e) {
-            setCurrentStep.call(self, 'installing')
-            external.invoke('apply')
+            setCurrentStep.call(this, slugs.installing)
+            external[slugs.invoke]('apply')
             progressDescriptionText.innerHTML = 'Installing Dashboard v' + downloadVersion
         }
 
         function verificationFailed(e) {
             console.log('verification failed: ' + e)
+            setFailureState('verification')
         }
 
         function updateComplete(e) {
             console.log(e)
-            setCurrentStep.call(self, 'finished')
+            setCurrentStep.call(this, slugs.finished)
             progressDescriptionText.innerHTML = 'Dashboard v' + downloadVersion + ' installed!';
             setTimeout(
                 function () {
-                    external.invoke('exit')
+                    external[slugs.invoke]('exit')
                 }, 2500);
         }
 
         function updateFailed(e) {
             console.error('update failed: ' + e)
+            setFailureState('updating')
+        }
+
+        function failureStateCancelCallback(e) {
+            e.preventDefault()
+            console.log('cancel callback')
+            // external cancel call here
+        }
+
+        function failureStateRetryCallback(e) {
+            e.preventDefault()
+            console.log('retry callback')
+            // external retry call here
         }
     </script>
 </head>
@@ -398,6 +543,18 @@
             <div class="progress-description">
                 <span class="text">&nbsp;</span>
                 <span class="quantify"></span>
+
+                <div class="failure-controls-wrapper">
+                    <a class="retry" href="#">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10.2375 1.7625C9.15 0.675 7.6575 0 6 0C4.4087 0 2.88258 0.632141 1.75736 1.75736C0.632141 2.88258 0 4.4087 0 6C0 7.5913 0.632141 9.11742 1.75736 10.2426C2.88258 11.3679 4.4087 12 6 12C8.7975 12 11.13 10.0875 11.7975 7.5H10.2375C9.6225 9.2475 7.9575 10.5 6 10.5C4.80653 10.5 3.66193 10.0259 2.81802 9.18198C1.97411 8.33807 1.5 7.19347 1.5 6C1.5 4.80653 1.97411 3.66193 2.81802 2.81802C3.66193 1.97411 4.80653 1.5 6 1.5C7.245 1.5 8.355 2.0175 9.165 2.835L6.75 5.25H12V0L10.2375 1.7625Z" fill="#3F8BDE"/>
+                        </svg>
+                        Retry
+                    </a>
+                    <a class="cancel" href="#">
+                        Cancel
+                    </a>
+                </div>
             </div>
 
             <div class="progress-bar">
