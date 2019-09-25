@@ -7,6 +7,7 @@ use console::{style};
 
 
 fn main() {
+    println!("test");
     println!("{}", style(LOGO).cyan());
 
     let matches = App::new("Quiche CLI")
