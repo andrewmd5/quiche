@@ -1,0 +1,27 @@
+name: Rust
+
+on: [push]
+
+jobs:
+  release:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build
+      run: cargo build --target=i686-pc-windows-msvc --release --verbose
+    - name: Run tests
+      run: cargo test --verbose
+      
+  debug:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build
+      run: cargo build --target=i686-pc-windows-msvc --verbose
+    - name: Run tests
+      run: cargo test --verbose
+    
