@@ -9,6 +9,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
+    - name: RustUp
+      run: rustup target add i686-pc-windows-msvc
     - name: Build
       run: cargo build --target=i686-pc-windows-msvc --release --verbose
     - name: Run tests
@@ -20,6 +22,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
+    - name: RustUp
+      run: rustup target add i686-pc-windows-msvc
     - name: Build
       run: cargo build --target=i686-pc-windows-msvc --verbose
     - name: Run tests
