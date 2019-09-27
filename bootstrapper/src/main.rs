@@ -30,6 +30,7 @@ fn main() -> Result<(), BootstrapError> {
     if !cfg!(debug_assertions) && is_compiled_for_64_bit() {
         panic!("Build against i686-pc-windows-msvc for production releases.")
     }
+
     if let Err(e) = run() {
         match e {
             BootstrapError::NeedWindowsMediaPack(_) => {
@@ -141,7 +142,7 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         "launch" => {
             launch_and_close(webview);
         }
-        "exit" => {
+        "restart" => {
             std::process::exit(0);
         }
         _ => {

@@ -6,7 +6,9 @@ pub mod os;
 pub mod updater {
 
     use crate::etc::constants::BootstrapError;
-    use crate::io::disk::{delete_dir_contents, dir_contains_all_files, get_dir_files};
+    use crate::io::disk::{
+        delete_dir_contents, dir_contains_all_files, get_dir_files, get_filename,
+    };
     use crate::io::hash::sha_256;
     use crate::io::zip::unzip;
     use crate::net::http::{download_file, download_toml};
@@ -124,7 +126,7 @@ pub mod updater {
         /// If all files are present, it then compares the remote and local version.
         /// Using this method bad installs/updates can be recovered.
         pub fn validate(&self) -> bool {
-            if !validate_files(self.get_package_files(), self.install_path.clone()) {
+            if !validate_files(&self.install_path, &self.get_package_files()) {
                 println!("We need to update because required files are missing.");
                 return false;
             }
@@ -251,8 +253,8 @@ pub mod updater {
     }
 
     /// checks if all the files present in a vector exist in a given directory.
-    fn validate_files(target_files: Vec<String>, input: String) -> bool {
-        dir_contains_all_files(target_files, &input)
+    fn validate_files(input: &String, target_files: &Vec<String>) -> bool {
+        dir_contains_all_files(input, target_files)
     }
 
     /// checks if the downloaded file hash matches that of the one in the manifest.
@@ -359,17 +361,32 @@ pub mod updater {
             return Err(BootstrapError::InstallationFailed(backup_error).to_string());
         }
         //stage the update
-        if !unzip(&download_path, &update_staging_path) {
-            return Err(BootstrapError::InstallationFailed(format!(
-                "Unable to extract update to {}",
-                update_staging_path.display()
-            ))
-            .to_string());
+        match unzip(&download_path, &update_staging_path) {
+            Ok(_o) => _o,
+            Err(e) => {
+                return Err(BootstrapError::InstallationFailed(format!(
+                    "Unable to extract update to {} due to issue: {}",
+                    update_staging_path.display(),
+                    e
+                ))
+                .to_string())
+            }
         }
+
+        let current_exe = match std::env::current_exe() {
+            Ok(exe) => get_filename(&exe),
+            Err(e) => {
+                return Err(BootstrapError::InstallationFailed(format!(
+                    "Unable to locate current exe: {}",
+                    e
+                ))
+                .to_string())
+            }
+        };
 
         //delete the install without deleting the root folder.
         let demo_dir = read_dir(&install_path);
-        if let Err(e) = delete_dir_contents(demo_dir, vec!["pick.txt".to_string()]) {
+        if let Err(e) = delete_dir_contents(demo_dir, &vec![current_exe]) {
             let delete_error = format!(
                 "Unable to cleanup current installation located at {} due to: {}",
                 &install_path, e

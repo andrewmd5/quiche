@@ -1,13 +1,11 @@
 use clap::{App, Arg};
+use console::style;
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
-use quiche::io::zip::zip_with_progress;
 use quiche::io::disk::get_total_files;
+use quiche::io::zip::zip_with_progress;
 use quiche::updater::{get_releases, ReleaseBranch};
-use console::{style};
-
-
 fn main() {
-    println!("test");
+    println!("Commencing yak shaving");
     println!("{}", style(LOGO).cyan());
 
     let matches = App::new("Quiche CLI")
@@ -35,24 +33,24 @@ fn main() {
                 .value_name("VERSION")
                 .required(true)
                 .help("The version you wish to create or fetch"),
-        )
-        .get_matches();
-
-    let branch = ReleaseBranch::from(matches.value_of("branch").unwrap_or(""));
-
-    let releases = match get_releases() {
-        Some(r) => r,
-        None => panic!("cant"),
-    };
-
-    let test_dir =  String::from("E:\\UpdateTest\\InstalledFolder\\");
-    let file_count = get_total_files(test_dir.clone()).unwrap();
+        ).get_matches();
 
     
 
+    let branch = ReleaseBranch::from(matches.value_of("branch").unwrap_or(""));
+
+    if let Some(releases) = get_releases() {
+       
+    } else {
+         println!("cant");
+    }
+
+    let test_dir = String::from("E:\\UpdateTest\\InstalledFolder\\");
+    let file_count = get_total_files(&test_dir).unwrap();
+
     let bar = ProgressBar::new_spinner();
-     bar.enable_steady_tick(200);
-     bar.set_style(
+    bar.enable_steady_tick(200);
+    bar.set_style(
         ProgressStyle::default_spinner()
             .tick_chars("/|\\- ")
             .template("{spinner:.dim.bold} Packaging: {wide_msg}"),
@@ -62,14 +60,12 @@ fn main() {
         bar.tick();
     };
 
-  
-
     match zip_with_progress(
-       test_dir,
+        test_dir,
         String::from("E:\\UpdateTest\\test.zip"),
-        func_test) 
-    {
-        Ok(f) => println!("{}", f),
+        func_test,
+    ) {
+        Ok(f) => println!("Done"),
         Err(e) => println!("{}", e),
     };
     bar.finish_with_message("Done!");
