@@ -80,6 +80,12 @@ impl From<&str> for ReleaseBranch {
     }
 }
 
+impl Default for ReleaseBranch {
+    fn default() -> ReleaseBranch {
+        ReleaseBranch::Stable
+    }
+}
+
 impl From<reqwest::Error> for BootstrapError {
     fn from(error: reqwest::Error) -> Self {
         BootstrapError::RequestError(error)

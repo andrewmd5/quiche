@@ -10,7 +10,7 @@ use rainway::{
     get_installed_version, is_installed, kill_rainway_processes, launch_rainway,
 };
 
-use quiche::updater::{get_branch, ActiveUpdate, UpdateType};
+use quiche::updater::{ActiveUpdate, UpdateType};
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
 use ui::window::set_dpi_aware;
@@ -78,20 +78,19 @@ fn run() -> Result<(), BootstrapError> {
     if !rainway_installed {
         check_system_compatibility()?;
     }
+
     //regardless of whether we need to update or install, we need the latest branch.
-    match get_branch(get_config_branch()) {
-        Some(b) => update.branch = b,
-        None => {
-            if rainway_installed {
-                println!("Unable to check for latest branch. Starting current version.");
-                launch_rainway();
-                return Ok(());
-            } else {
-                return Err(BootstrapError::ReleaseLookupFailed);
-            }
+    if let Err(e) = update.get_manifest(get_config_branch()) {
+        if rainway_installed {
+            println!("Unable to check for latest branch. Starting current version.");
+            launch_rainway();
+            return Ok(());
+        } else {
+            return Err(e);
         }
     }
-    update.temp_name = format!("{}{}", update.get_hash(), update.get_ext());
+    update.set_temp_file();
+
     //check if Rainway requires an update if it's installed
     if rainway_installed {
         let valid = update.validate();
@@ -142,7 +141,7 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         "launch" => {
             launch_and_close(webview);
         }
-        "restart" => {
+        "exit" => {
             std::process::exit(0);
         }
         _ => {

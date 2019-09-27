@@ -14,7 +14,6 @@ pub mod updater {
     use crate::net::http::{download_file, download_toml};
     use fs_extra::dir::{copy, move_dir, CopyOptions};
     use serde::{Deserialize, Serialize};
-    use version_compare::Version;
 
     use std::{
         env::temp_dir,
@@ -70,21 +69,60 @@ pub mod updater {
     #[derive(Default)]
     pub struct ActiveUpdate {
         pub update_type: UpdateType,
-        pub branch: Branch,
+        pub branch: ReleaseBranch,
+        pub manifest: Manifest,
         pub temp_name: String,
         pub current_version: String,
         pub install_path: String,
     }
 
     impl ActiveUpdate {
+
+        /// fetches and sets the manifest for a given branch
+        pub fn get_manifest(&mut self, branch: ReleaseBranch) -> Result<(), BootstrapError> {
+            let err = Err(BootstrapError::ReleaseLookupFailed);
+            if let Some(releases) = get_releases() {
+                let manifest_url = match branch {
+                    ReleaseBranch::Stable => &releases.stable.manifest_url,
+                    ReleaseBranch::Beta => &releases.beta.manifest_url,
+                    ReleaseBranch::Nightly => &releases.nightly.manifest_url,
+                };
+                if manifest_url.is_empty() {
+                    sentry::capture_message(
+                        format!("Manifest URL missing the {} branch.", branch).as_str(),
+                        sentry::Level::Error,
+                    );
+                    return err;
+                }
+
+                println!("pulling the latest release for the {:?} branch", branch);
+                match download_toml::<Manifest>(&manifest_url) {
+                    Ok(m) => {
+                        self.manifest = m;
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        sentry::capture_message(
+                            format!("Failed to fetch branch {}: {}", branch, e).as_str(),
+                            sentry::Level::Error,
+                        );
+                        // This is an unrecoverable issue, so we return None
+                        // and present a generic error message.
+                        return err;
+                    }
+                }
+            }
+            err
+        }
+
         pub fn get_package_files(&self) -> Vec<String> {
-            self.branch.manifest.as_ref().unwrap().package.files.clone()
+            self.manifest.package.files.clone()
         }
         pub fn get_temp_name(&self) -> String {
             self.temp_name.clone()
         }
         pub fn get_version(&self) -> String {
-            self.branch.version.clone()
+            self.manifest.version.clone()
         }
         pub fn get_ext(&self) -> String {
             match self.update_type {
@@ -95,31 +133,21 @@ pub mod updater {
         }
         pub fn get_url(&self) -> String {
             match self.update_type {
-                UpdateType::Install => self
-                    .branch
-                    .manifest
-                    .as_ref()
-                    .unwrap()
-                    .installer
-                    .url
-                    .as_str(),
-                UpdateType::Patch => self.branch.manifest.as_ref().unwrap().package.url.as_str(),
+                UpdateType::Install => self.manifest.installer.url.as_str(),
+                UpdateType::Patch => self.manifest.package.url.as_str(),
             }
             .to_string()
         }
         pub fn get_hash(&self) -> String {
             match self.update_type {
-                UpdateType::Install => self
-                    .branch
-                    .manifest
-                    .as_ref()
-                    .unwrap()
-                    .installer
-                    .hash
-                    .as_str(),
-                UpdateType::Patch => self.branch.manifest.as_ref().unwrap().package.hash.as_str(),
+                UpdateType::Install => self.manifest.installer.hash.as_str(),
+                UpdateType::Patch => self.manifest.package.hash.as_str(),
             }
             .to_string()
+        }
+        /// creates a temporary file name for the update.
+        pub fn set_temp_file(&mut self) {
+            self.temp_name = format!("{}{}", self.get_hash(), self.get_ext())
         }
         /// Checks if the current installation is out of date.
         /// It does this by first checking if all the files listed in the manifest are present on disk.
@@ -130,28 +158,7 @@ pub mod updater {
                 println!("We need to update because required files are missing.");
                 return false;
             }
-
-            if let Some(latest_ver) = Version::from(&self.branch.version) {
-                if let Some(installed_ver) = Version::from(&self.current_version) {
-                    if installed_ver < latest_ver {
-                        return false;
-                    } else {
-                        return true;
-                    }
-                }
-            }
-            sentry::capture_message(
-                format!(
-                    "{}",
-                    BootstrapError::VersionCheckFailed(
-                        self.branch.version.to_string(),
-                        self.current_version.clone()
-                    )
-                )
-                .as_str(),
-                sentry::Level::Error,
-            );
-            return false;
+            return &self.current_version == &self.manifest.version;
         }
     }
 
@@ -169,8 +176,6 @@ pub mod updater {
         pub version: String,
         /// The URL to the manifest file of the branches latest release.
         pub manifest_url: String,
-        /// The full manifest for the branch.
-        pub manifest: Option<Manifest>,
     }
 
     #[derive(Serialize, Deserialize)]
@@ -191,15 +196,17 @@ pub mod updater {
         }
     }
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, Default)]
     pub struct Manifest {
+        /// the version of the release
+        pub version: String,
         /// The update package.
         pub package: Package,
         /// The full installer.
         pub installer: Installer,
     }
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, Default)]
     pub struct Installer {
         /// The URL of the actual full installer.
         pub url: String,
@@ -207,7 +214,7 @@ pub mod updater {
         pub hash: String,
     }
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, Default)]
     pub struct Package {
         /// The URL to the zip package containing all the new files.
         pub url: String,
@@ -228,28 +235,6 @@ pub mod updater {
                 return None;
             }
         }
-    }
-
-    /// fetches the latest version of a branch and it's release manifest.
-    pub fn get_branch(branch: ReleaseBranch) -> Option<Branch> {
-        let mut releases = match get_releases() {
-            None => return None,
-            Some(r) => r,
-        };
-        println!("pulling the latest release for the {:?} branch", branch);
-        releases.stable.manifest = match download_toml::<Manifest>(&releases.stable.manifest_url) {
-            Ok(m) => Some(m),
-            Err(e) => {
-                sentry::capture_message(
-                    format!("Failed to fetch branch {}: {}", branch, e).as_str(),
-                    sentry::Level::Error,
-                );
-                // This is an unrecoverable issue, so we return None
-                // and present a generic error message.
-                return None;
-            }
-        };
-        Some(releases.stable)
     }
 
     /// checks if all the files present in a vector exist in a given directory.

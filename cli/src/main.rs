@@ -4,6 +4,14 @@ use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use quiche::io::disk::get_total_files;
 use quiche::io::zip::zip_with_progress;
 use quiche::updater::{get_releases, ReleaseBranch};
+
+struct Recipie {
+    version: String,
+    installer_path: String,
+    package_source: String,
+    branch: ReleaseBranch,
+}
+
 fn main() {
     println!("Commencing yak shaving");
     println!("{}", style(LOGO).cyan());
@@ -33,16 +41,15 @@ fn main() {
                 .value_name("VERSION")
                 .required(true)
                 .help("The version you wish to create or fetch"),
-        ).get_matches();
-
-    
+        )
+        .get_matches();
 
     let branch = ReleaseBranch::from(matches.value_of("branch").unwrap_or(""));
 
     if let Some(releases) = get_releases() {
-       
+
     } else {
-         println!("cant");
+        println!("cant");
     }
 
     let test_dir = String::from("E:\\UpdateTest\\InstalledFolder\\");
