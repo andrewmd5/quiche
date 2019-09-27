@@ -31,7 +31,8 @@ pub fn open_url(url: &'static str) {
     use winapi::um::shellapi::ShellExecuteW;
     use winapi::um::winuser::SW_SHOWNORMAL;
 
-    static OPEN: &[u16] = &['o' as u16, 'p' as u16, 'e' as u16, 'n' as u16, 0x0000];
+    let open = U16CString::from_str("open").unwrap();
+
     let url = U16CString::from_str(url).unwrap();
     unsafe {
         let coinitializeex_result = CoInitializeEx(
@@ -40,7 +41,7 @@ pub fn open_url(url: &'static str) {
         );
         let code = ShellExecuteW(
             ptr::null_mut(),
-            OPEN.as_ptr(),
+            open.as_ptr(),
             url.as_ptr(),
             ptr::null(),
             ptr::null(),

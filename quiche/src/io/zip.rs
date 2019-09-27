@@ -8,7 +8,7 @@ use zip::result::ZipError;
 use zip::write::FileOptions;
 
 /// creates a zip file from a given directory
-pub fn zip_with_progress<F>(input: String, output: String, callback: F) -> Result<bool, Error>
+pub fn zip_with_progress<F>(input: String, output: String, callback: F) -> Result<(), Error>
 where
     F: Fn(String),
 {
@@ -30,33 +30,23 @@ where
         let mut file_path = PathBuf::new();
         file_path.push(&input);
         file_path.push(&entry);
-        zip.start_file_from_path(Path::new(&entry), options);
+        zip.start_file_from_path(Path::new(&entry), options)?;
         let mut f = File::open(&file_path)?;
         f.read_to_end(&mut buffer)?;
         zip.write_all(&*buffer)?;
         buffer.clear();
-        
     }
     zip.finish()?;
-    Ok(true)
+    Ok(())
 }
 
 /// unzips an archive to a target directory,
 /// returning false if any files false.
-pub fn unzip(input: &PathBuf, output: &PathBuf) -> bool {
-    let input_file = match File::open(&input) {
-        Ok(f) => f,
-        Err(_e) => return false,
-    };
-    let mut archive = match zip::ZipArchive::new(input_file) {
-        Ok(a) => a,
-        Err(_e) => return false,
-    };
+pub fn unzip(input: &PathBuf, output: &PathBuf) -> Result<(), Error> {
+    let input_file = File::open(&input)?;
+    let mut archive = zip::ZipArchive::new(input_file)?;
     for i in 0..archive.len() {
-        let mut file = match archive.by_index(i) {
-            Ok(f) => f,
-            Err(_e) => return false,
-        };
+        let mut file = archive.by_index(i)?;
         let mut outpath = output.clone();
         outpath.push(file.sanitized_name());
         if (&*file.name()).ends_with('/') {
@@ -66,9 +56,7 @@ pub fn unzip(input: &PathBuf, output: &PathBuf) -> bool {
                 i,
                 outpath.as_path().display()
             );
-            if let Err(_e) = create_dir_all(&outpath) {
-                return false;
-            }
+            create_dir_all(&outpath)?;
         } else {
             #[cfg(debug_assertions)]
             println!(
@@ -79,19 +67,12 @@ pub fn unzip(input: &PathBuf, output: &PathBuf) -> bool {
             );
             if let Some(p) = outpath.parent() {
                 if !p.exists() {
-                    if let Err(_e) = create_dir_all(&p) {
-                        return false;
-                    }
+                    create_dir_all(&p)?;
                 }
             }
-            let mut outfile = match File::create(&outpath) {
-                Ok(o) => o,
-                Err(_e) => return false,
-            };
-            if let Err(_e) = copy(&mut file, &mut outfile) {
-                return false;
-            }
+            let mut outfile = File::create(&outpath)?;
+            copy(&mut file, &mut outfile)?;
         }
     }
-    true
+    Ok(())
 }
