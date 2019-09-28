@@ -653,18 +653,7 @@ pub mod updater {
                 .to_string())
             }
         };
-
-        let current_exe = match std::env::current_exe() {
-            Ok(exe) => get_filename(&exe),
-            Err(e) => {
-                return Err(BootstrapError::InstallationFailed(format!(
-                    "Unable to locate current exe: {}",
-                    e
-                ))
-                .to_string())
-            }
-        };
-
+        
         //delete the install without deleting the root folder.
         let demo_dir = read_dir(&install_path);
         if let Err(e) = delete_dir_contents(demo_dir, &vec![current_exe]) {
@@ -680,26 +669,22 @@ pub mod updater {
             return Err(BootstrapError::InstallationFailed(delete_error).to_string());
         }
 
-        //apply the update
-        match move_dir(&update_staging_path, &install_path, &options) {
-            Ok(_o) => {
-                return Ok("'Rainway Updated!'".to_string());
+        if let Err(e) = move_dir(&update_staging_path, &install_path, &options) {
+            let update_error_message = format!(
+                "Failed to apply update to {} from {}: {}",
+                &install_path,
+                &update_staging_path.display(),
+                e
+            );
+            if let Ok(_e) = move_dir(&backup_path, &install_path, &options) {
+                println!("rolled back update.");
+            } else {
+                println!("failed to rollback update.")
             }
-            Err(e) => {
-                let update_error_message = format!(
-                    "Failed to apply update to {} from {}: {}",
-                    &install_path,
-                    &update_staging_path.display(),
-                    e
-                );
-                if let Ok(_e) = move_dir(&backup_path, &install_path, &options) {
-                    println!("rolled back update.");
-                } else {
-                    println!("failed to rollback update.")
-                }
-                return Err(BootstrapError::InstallationFailed(update_error_message).to_string());
-            }
+            return Err(BootstrapError::InstallationFailed(update_error_message).to_string());
         }
+
+        Ok("Rainway updated!".to_string())
 
         //dir_contains_all_files(package_files, &install_path);
     }

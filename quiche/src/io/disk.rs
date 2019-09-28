@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 pub fn dir_contains_all_files(dir_path: &Path, files: &Vec<String>) -> bool {
     match get_dir_files(dir_path) {
         Ok(dir_files) => files.iter().all(|file| dir_files.contains(file)),
-        Err(e) => false,
+        Err(_e) => false,
     }
 }
 

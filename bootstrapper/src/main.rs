@@ -146,7 +146,7 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         "launch" => {
             launch_and_close(webview);
         }
-        "restart" => {
+        "exit" => {
             std::process::exit(0);
         }
         _ => {
