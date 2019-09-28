@@ -47,16 +47,14 @@ pub fn unzip(input: &PathBuf, output: &PathBuf) -> Result<(), Error> {
         let mut outpath = output.clone();
         outpath.push(file.sanitized_name());
         if (&*file.name()).ends_with('/') {
-            #[cfg(debug_assertions)]
-            println!(
+            log::debug!(
                 "File {} extracted to \"{}\"",
                 i,
                 outpath.as_path().display()
             );
             create_dir_all(&outpath)?;
         } else {
-            #[cfg(debug_assertions)]
-            println!(
+            log::debug!(
                 "File {} extracted to \"{}\" ({} bytes)",
                 i,
                 outpath.as_path().display(),

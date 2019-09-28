@@ -61,6 +61,7 @@ pub fn download_file(
     if !head_response.status().is_success() {
         writer.faulted = true;
         drop(writer);
+        log::error!("unable to download {} as the remote file is missing.", url);
         return Err(BootstrapError::RemoteFileMissing(url.to_string()));
     }
     let total_size = head_response
@@ -72,6 +73,7 @@ pub fn download_file(
     if total_size <= 0 {
         writer.faulted = true;
         drop(writer);
+        log::error!("unable to download {} as the remote file is empty.", url);
         return Err(BootstrapError::RemoteFileEmpty(url.to_string()));
     }
     writer.total_bytes = total_size;
@@ -89,9 +91,18 @@ pub fn download_file(
         progress: r,
         inner: get_response,
     };
+    log::info!(
+        "starting download of {} ({} bytes) to {}.",
+        url,
+        total_size,
+        path.display()
+    );
 
     match copy(&mut source, &mut temp_file) {
         Err(e) => return Err(BootstrapError::IOError(e)),
-        Ok(r) => return Ok(r == total_size),
+        Ok(r) => {
+            log::info!("downloaded {} bytes.", r);
+            return Ok(r == total_size);
+        }
     };
 }

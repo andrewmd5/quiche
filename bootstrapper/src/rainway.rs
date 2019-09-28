@@ -51,7 +51,7 @@ pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
 /// launches the Rainway service (Radar)
 pub fn launch_rainway() {
     match start_service(env!("RAINWAY_SERVICE")) {
-        Ok(s) => println!("Rainway started: {}", s),
+        Ok(s) => log::info!("Rainway started: {}", s),
         Err(e) => {
             show_error("Rainway Startup Failure", format!("{}", e));
             sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
@@ -65,7 +65,7 @@ pub fn kill_rainway_processes() {
     for (_pid, proc_) in sys.get_process_list() {
         if proc_.name() == "Rainway.exe" || proc_.name() == "CefSharp.BrowserSubprocess.exe" {
             if proc_.kill(Signal::Kill) {
-                println!("Killed {}", proc_.name());
+                log::info!("Killed {}", proc_.name());
             }
         }
     }
@@ -77,19 +77,24 @@ pub fn check_system_compatibility() -> Result<(), BootstrapError> {
     let system_info = get_system_info()?;
 
     if !system_info.is_x64 {
+        log::error!("architecture unsupported");
         return Err(BootstrapError::ArchitectureUnsupported);
     }
 
     if !system_info.is_supported {
+        log::error!("{} is unsupported", system_info.product_name);
         return Err(BootstrapError::WindowsVersionUnsupported);
     }
 
     if system_info.is_n_edition {
+        log::warn!("Windows N detected.");
         if needs_media_pack()? {
+            log::error!("Windows Media Pack is not installed.");
             return Err(BootstrapError::NeedWindowsMediaPack(
                 system_info.product_name,
             ));
         }
     }
+    log::info!("current system is compatible.");
     Ok(())
 }

@@ -39,7 +39,7 @@ pub fn start_service(service_name: &str) -> Result<bool, BootstrapError> {
     };
     if service_status.current_state != ServiceState::Stopped {
         if let Ok(_s) = service.stop() {
-            println!("Stopped {}", service_name);
+            log::info!("Stopped {}", service_name);
         }
     }
     match service.start(&[OsStr::new("Started from Rust!")]) {

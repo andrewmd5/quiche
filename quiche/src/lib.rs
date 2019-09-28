@@ -382,7 +382,7 @@ pub mod updater {
                     branch
                 )));
             }
-            println!("pulling the latest release for the {:?} branch", branch);
+           log::info!("pulling the latest release for the {:?} branch", branch);
             match download_toml::<Manifest>(&manifest_url) {
                 Ok(m) => {
                     self.manifest = m;
@@ -440,7 +440,7 @@ pub mod updater {
         /// Using this method bad installs/updates can be recovered.
         pub fn validate(&self) -> bool {
             if !validate_files(&self.install_path, &self.get_package_files()) {
-                println!("We need to update because required files are missing.");
+                log::warn!("We need to update because required files are missing.");
                 return false;
             }
             return &self.current_version == &self.manifest.version;
@@ -534,14 +534,17 @@ pub mod updater {
     pub fn verify(remote_hash: String, input_file: String) -> Result<String, String> {
         let mut download_path = temp_dir();
         download_path.push(input_file);
+        log::info!("hashing {}", &download_path.display());
         let result: Result<String, String> = Ok(String::default());
         let err: Result<String, String> = Err(BootstrapError::SignatureMismatch.to_string());
         if let Some(local_hash) = sha_256(&download_path) {
+            log::info!("finished hashing {}", &download_path.display());
             match local_hash == remote_hash {
                 true => return result,
                 false => return err,
             }
         } else {
+            log::error!("failed to hash {}", &download_path.display());
             return err;
         }
     }
@@ -576,6 +579,7 @@ pub mod updater {
             }
             thread::sleep(Duration::from_millis(16));
         });
+        log::info!("download background thread started");
         let mut download_path = temp_dir();
         download_path.push(output_file);
 
@@ -583,6 +587,7 @@ pub mod updater {
             .map_err(|err| format!("{}", err))
             .map(|output| format!("{}", output));
         let _res = child.join();
+        log::info!("download background thread finished.");
         results
     }
 
@@ -597,26 +602,35 @@ pub mod updater {
         download_path.push(package_name);
         let mut update_staging_path = temp_dir();
         update_staging_path.push(format!("Rainway_Stage_{}", &version));
+
+        log::debug!("update_staging_path == {}", &update_staging_path.display());
+        
         if update_staging_path.exists() {
+            log::info!("update staging folder exist. attempting to clean.");
             if let Err(e) = remove_dir_all(&update_staging_path) {
                 let stage_clean_error = format!(
                     "Aborted update due to modification failure on stage {}: {}",
                     update_staging_path.display(),
                     e
                 );
+                log::error!("{}", stage_clean_error);
                 return Err(BootstrapError::InstallationFailed(stage_clean_error).to_string());
             }
         }
 
         let mut backup_path = temp_dir();
         backup_path.push(format!("Rainway_Backup_{}", &version));
+
+        log::debug!("backup_path == {}", &backup_path.display());
         if backup_path.exists() {
+            log::info!("backup folder exist. attempting to clean.");
             if let Err(e) = remove_dir_all(&backup_path) {
                 let backup_clean_error = format!(
                     "Aborted update due to modification failure on backup {}: {}",
                     backup_path.display(),
                     e
                 );
+                log::error!("{}", backup_clean_error);
                 return Err(BootstrapError::InstallationFailed(backup_clean_error).to_string());
             }
         }
@@ -625,23 +639,29 @@ pub mod updater {
         options.content_only = true;
         options.overwrite = true;
         //make the backup
+        log::info!("attempting to create a backup of the current installation.");
         if let Err(e) = copy(&install_path, &backup_path, &options) {
             let backup_error = format!(
                 "Unable to backup installation to {}: {}",
                 backup_path.display(),
                 e
             );
+            log::error!("{}", backup_error);
             return Err(BootstrapError::InstallationFailed(backup_error).to_string());
         }
+        log::info!("backup completed.");
+        log::info!("attempting to extract update package.");
         //stage the update
         if let Err(e) = unzip(&download_path, &update_staging_path) {
-            return Err(BootstrapError::InstallationFailed(format!(
+            let unzip_error = format!(
                 "Unable to extract update to {} due to issue: {}",
                 update_staging_path.display(),
                 e
-            ))
-            .to_string());
+            );
+            log::error!("{}", unzip_error);
+            return Err(BootstrapError::InstallationFailed(unzip_error).to_string());
         }
+        log::info!("update extracted to {}", &update_staging_path.display());
         let current_exe = match std::env::current_exe() {
             Ok(exe) => get_filename(&exe),
             Err(e) => {
@@ -652,22 +672,28 @@ pub mod updater {
                 .to_string())
             }
         };
-        
+
+        log::debug!("current_exe == {}", &current_exe);
+        let log_file = format!("{}.log", env!("CARGO_PKG_NAME"));
+
         //delete the install without deleting the root folder.
+        log::info!("attempting to delete all the contents of {}", &install_path);
         let demo_dir = read_dir(&install_path);
-        if let Err(e) = delete_dir_contents(demo_dir, &vec![current_exe]) {
+        if let Err(e) = delete_dir_contents(demo_dir, &vec![current_exe, log_file]) {
             let delete_error = format!(
                 "Unable to cleanup current installation located at {} due to: {}",
                 &install_path, e
             );
+            log::error!("{}", delete_error);
+            log::warn!("attempting to roll back.");
             if let Ok(_e) = move_dir(&backup_path, &install_path, &options) {
-                println!("rolled back update process.");
+                log::warn!("rolled back update process.");
             } else {
-                println!("failed to rollback update process.")
+                 log::error!("failed to rollback update process.")
             }
             return Err(BootstrapError::InstallationFailed(delete_error).to_string());
         }
-
+        log::info!("attempting to write updated files.");
         if let Err(e) = move_dir(&update_staging_path, &install_path, &options) {
             let update_error_message = format!(
                 "Failed to apply update to {} from {}: {}",
@@ -675,14 +701,15 @@ pub mod updater {
                 &update_staging_path.display(),
                 e
             );
+            log::error!("{}", update_error_message);
             if let Ok(_e) = move_dir(&backup_path, &install_path, &options) {
-                println!("rolled back update.");
+                log::warn!("rolled back update.");
             } else {
-                println!("failed to rollback update.")
+                log::error!("failed to rollback update.")
             }
             return Err(BootstrapError::InstallationFailed(update_error_message).to_string());
         }
-
+        log::info!("update went off without a hitch.");
         Ok("Rainway updated!".to_string())
 
         //dir_contains_all_files(package_files, &install_path);
@@ -696,12 +723,23 @@ pub mod updater {
         use std::process::Command;
         let mut download_path = temp_dir();
         download_path.push(installer_name);
-        Command::new(download_path)
+        log::info!("running {}", &download_path.display());
+        let results = Command::new(download_path)
             .args(&[""])
             .creation_flags(0x08000000)
             .output()
-            .map_err(|err| format!("{}", BootstrapError::InstallationFailed(err.to_string())))
-            .map(|output| format!("'{}'", output.status.success()))
+            .map_err(|err| BootstrapError::InstallationFailed(err.to_string()).to_string())
+            .map(|output| {
+                String::from_utf8_lossy(&output.stdout)
+                    .to_owned()
+                    .to_string()
+            });
+        if let Ok(output) = &results {
+             log::info!("{}", output);
+        } else {
+            log::warn!("No output");
+        }
+        results
     }
 
 }

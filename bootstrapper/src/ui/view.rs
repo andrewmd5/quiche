@@ -50,7 +50,7 @@ pub fn download_update<T: 'static>(webview: &mut WebView<'_, T>, update: &Active
     run_async(
         webview,
         move || {
-            let func_test = move |total_bytes: u64, downloaded_bytes: u64| {
+            let download_progress = move |total_bytes: u64, downloaded_bytes: u64| {
                 let data = format!(
                     "downloadProgress('{}', '{}', '{}')",
                     version, total_bytes, downloaded_bytes
@@ -59,7 +59,7 @@ pub fn download_update<T: 'static>(webview: &mut WebView<'_, T>, update: &Active
                     .dispatch(move |webview| webview.eval(&data.to_string()))
                     .unwrap();
             };
-            download_with_callback(url, temp_file, func_test)
+            download_with_callback(url, temp_file, download_progress)
         },
         download_complete.to_string(),
         error_callback.to_string(),

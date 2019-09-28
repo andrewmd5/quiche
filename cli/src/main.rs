@@ -32,7 +32,7 @@ fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
                 message
             ))
         })
-        .chain(File::create("quiche.log")?);
+        .chain(File::create(format!("{}.log", env!("CARGO_PKG_NAME")))?);
 
     let stdout_config = fern::Dispatch::new()
         .format(move |out, message, record| {
