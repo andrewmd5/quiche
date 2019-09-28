@@ -255,10 +255,9 @@ pub mod bakery {
             let mut copied_installer_path = self.output_dir.clone();
             copied_installer_path.push("installer.exe");
 
-            match copy(&self.installer_path, &copied_installer_path, &options) {
-                Ok(_c) => _c,
-                Err(e) => return Err(BootstrapError::RecipeStageFailure(e.to_string())),
-            };
+            if let Err(e) = copy(&self.installer_path, &copied_installer_path, &options) {
+                return Err(BootstrapError::RecipeStageFailure(e.to_string()));
+            }
             log::info!(
                 "copied the full installer to to {}",
                 &copied_installer_path.display()
