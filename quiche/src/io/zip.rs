@@ -1,5 +1,5 @@
 use std::fs::{create_dir_all, File};
-use std::io::{copy, Error, ErrorKind};
+use std::io::{copy, Error};
 use std::path::{Path, PathBuf};
 
 use crate::io::disk::get_dir_files;

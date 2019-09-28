@@ -4,7 +4,7 @@ use quiche::os::service::start_service;
 use quiche::os::windows::get_uninstallers;
 use quiche::os::windows::{get_system_info, needs_media_pack};
 use quiche::updater::ReleaseBranch;
-use sentry::protocol::{Event, Level};
+
 use std::process;
 use sysinfo::{ProcessExt, Signal, SystemExt};
 
