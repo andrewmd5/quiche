@@ -654,6 +654,17 @@ pub mod updater {
             }
         };
 
+        let current_exe = match std::env::current_exe() {
+            Ok(exe) => get_filename(&exe),
+            Err(e) => {
+                return Err(BootstrapError::InstallationFailed(format!(
+                    "Unable to locate current exe: {}",
+                    e
+                ))
+                .to_string())
+            }
+        };
+
         //delete the install without deleting the root folder.
         let demo_dir = read_dir(&install_path);
         if let Err(e) = delete_dir_contents(demo_dir, &vec![current_exe]) {
