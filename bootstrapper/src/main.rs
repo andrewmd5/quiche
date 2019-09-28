@@ -30,7 +30,6 @@ fn main() -> Result<(), BootstrapError> {
     if !cfg!(debug_assertions) && is_compiled_for_64_bit() {
         panic!("Build against i686-pc-windows-msvc for production releases.")
     }
-
     if let Err(e) = run() {
         match e {
             BootstrapError::NeedWindowsMediaPack(_) => {
@@ -80,10 +79,15 @@ fn run() -> Result<(), BootstrapError> {
     }
 
     //regardless of whether we need to update or install, we need the latest branch.
-    if let Err(e) = update.get_manifest(get_config_branch()) {
+    let config_branch = get_config_branch();
+    if let Err(e) = update.get_manifest(&config_branch) {
         if rainway_installed {
             println!("Unable to check for latest branch. Starting current version.");
             launch_rainway();
+            sentry::capture_message(
+                format!("Failed to fetch branch {}. {}", config_branch, e).as_str(),
+                sentry::Level::Error,
+            );
             return Ok(());
         } else {
             return Err(e);

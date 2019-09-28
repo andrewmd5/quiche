@@ -5,11 +5,11 @@ authors = ["Andrew Sampson <andrew@rainway.io>"]
 edition = "2018"
 build = "build.rs"
 
-[package.rainway]
-release_url = "http://local.vg:8080/Releases.toml"
+[quiche]
+base_release_url = "http://local.vg:8080"
+release_path = "/Releases.toml"
 
 [dependencies]
-sentry = { version = "0.12.0", features = ["with_device_info", "with_panic", "with_rust_info"] } 
 windows-service = "0.2.0"
 zip = "0.5"
 fs_extra = { git = "https://github.com/webdesus/fs_extra.git" }
@@ -19,4 +19,5 @@ serde = { version = "1.0", features = ["derive"] }
 reqwest = "0.9.19"
 winreg = "0.6"
 regex = "1"
-
+log = "0.4.8"
+fern = "0.5.8"

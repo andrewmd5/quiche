@@ -25,7 +25,11 @@ fn main() {
         _ => (),
     }
     println!(
-        "cargo:rustc-env=RAINWAY_RELEASE_URL={}",
-        find_cargo_field("release_url")
+        "cargo:rustc-env=BASE_RELEASE_URL={}",
+        find_cargo_field("base_release_url")
+    );
+    println!(
+        "cargo:rustc-env=RELEASE_PATH={}",
+        find_cargo_field("release_path")
     );
 }

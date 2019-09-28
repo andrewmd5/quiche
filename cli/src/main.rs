@@ -1,81 +1,140 @@
 use clap::{App, Arg};
-use console::style;
-use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
-use quiche::io::disk::get_total_files;
-use quiche::io::zip::zip_with_progress;
-use quiche::updater::{get_releases, ReleaseBranch};
+use fern::colors::{Color, ColoredLevelConfig};
+use quiche::bakery::Recipe;
+use std::env;
+use std::fs::File;
+use std::path::Path;
 
-struct Recipie {
-    version: String,
-    installer_path: String,
-    package_source: String,
-    branch: ReleaseBranch,
+fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
+    let colors = ColoredLevelConfig::new()
+        .trace(Color::BrightCyan)
+        .debug(Color::BrightMagenta)
+        .warn(Color::BrightYellow)
+        .info(Color::BrightGreen)
+        .error(Color::BrightRed);
+
+    let mut base_config = fern::Dispatch::new();
+
+    base_config = match verbosity {
+        0 => base_config.level(log::LevelFilter::Debug),
+        1 => base_config.level(log::LevelFilter::Info),
+        2 => base_config.level(log::LevelFilter::Warn),
+        _3_or_more => base_config.level(log::LevelFilter::Error),
+    };
+
+    // Separate file config so we can include colors in the terminal
+    let file_config = fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}][{}] {}",
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .chain(File::create("quiche.log")?);
+
+    let stdout_config = fern::Dispatch::new()
+        .format(move |out, message, record| {
+            out.finish(format_args!(
+                "[{}][{}] {}",
+                record.target(),
+                colors.color(record.level()),
+                message
+            ))
+        })
+        .chain(std::io::stdout());
+
+    base_config
+        .chain(file_config)
+        .chain(stdout_config)
+        .apply()?;
+
+    Ok(())
 }
-
 fn main() {
-    println!("Commencing yak shaving");
-    println!("{}", style(LOGO).cyan());
+    println!("{}", LOGO);
 
     let matches = App::new("Quiche CLI")
         .version("1.0")
         .author("Andrew Sampson <andrew@rainway.com>")
         .about("Build and fetch Rainway releases with ease.")
         .arg(
-            Arg::with_name("config")
-                .short("c")
-                .long("config")
+            Arg::with_name("recipe")
+                .short("r")
+                .long("recipe")
                 .value_name("FILE")
-                .help("Sets a custom config file")
+                .required(true)
+                .help("Sets a recipe for a release")
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("branch")
-                .short("b")
-                .value_name("NAME")
-                .required(true)
-                .help("Defines the branch quiche will be working work"),
+            clap::Arg::with_name("verbose")
+                .short("v")
+                .long("verbose")
+                .multiple(true)
+                .help("Increases logging verbosity each use for up to 3 times"),
         )
         .arg(
-            Arg::with_name("version")
-                .short("v")
-                .value_name("VERSION")
-                .required(true)
-                .help("The version you wish to create or fetch"),
+            Arg::with_name("release-override")
+                .short("u")
+                .value_name("URL")
+                .help("Overrides the default release URL.")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("l")
+                .short("l")
+                .help("Sets the level of verbosity"),
         )
         .get_matches();
 
-    let branch = ReleaseBranch::from(matches.value_of("branch").unwrap_or(""));
+    let verbosity: u64 = matches.occurrences_of("verbose");
+    setup_logging(verbosity).expect("failed to initialize logging.");
 
-    if let Some(releases) = get_releases() {
+    log::debug!("checking for recipe file.");
+    let recipe_path = match matches.value_of("recipe") {
+        Some(s) => Path::new(s),
+        None => panic!("The provided recipe path is empty."),
+    };
 
-    } else {
-        println!("cant");
+    log::debug!("checking for release host override.");
+    let release_override = matches.value_of("release-override").unwrap_or("");
+    if !release_override.is_empty() {
+        env::set_var("RELEASE_OVERRIDE", release_override);
+        log::info!(
+            "a release override was found. Quiche is now configured to use \"{}\" for remote releases.",
+            release_override
+        );
     }
 
-    let test_dir = String::from("E:\\UpdateTest\\InstalledFolder\\");
-    let file_count = get_total_files(&test_dir).unwrap();
+    let mut recipe = Recipe::from(recipe_path);
+    log::info!("read Quiche recipe from {}", recipe_path.display());
 
-    let bar = ProgressBar::new_spinner();
-    bar.enable_steady_tick(200);
-    bar.set_style(
-        ProgressStyle::default_spinner()
-            .tick_chars("/|\\- ")
-            .template("{spinner:.dim.bold} Packaging: {wide_msg}"),
-    );
-    let func_test = |file: String| {
-        bar.set_message(format!("{}", file).as_str());
-        bar.tick();
+    match recipe.prepare() {
+        Ok(_o) => _o,
+        Err(e) => {
+            log::error!("the recipe ingredients could not be prepared. {}", e);
+            panic!("preparations failed.");
+        }
+    }
+    log::info!("Quiche recipe prepared. attempted to bake.");
+
+    let dinner = match recipe.bake() {
+        Ok(d) => d,
+        Err(e) => {
+            log::error!("the recipe failed to bake properly. {}", e);
+            panic!("bake failure.");
+        }
     };
 
-    match zip_with_progress(
-        test_dir,
-        String::from("E:\\UpdateTest\\test.zip"),
-        func_test,
-    ) {
-        Ok(f) => println!("Done"),
-        Err(e) => println!("{}", e),
-    };
-    bar.finish_with_message("Done!");
+    match recipe.stage(dinner) {
+        Ok(_o) => log::info!("dinner is served! the release was successfully baked."),
+        Err(e) => {
+            log::error!("the recipe could not be staged. {}", e);
+            panic!("stage failure.");
+        }
+    }
 }
 
 const LOGO: &str = r#"

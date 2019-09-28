@@ -4,6 +4,7 @@ use quiche::os::service::start_service;
 use quiche::os::windows::get_uninstallers;
 use quiche::os::windows::{get_system_info, needs_media_pack};
 use quiche::updater::ReleaseBranch;
+use sentry::protocol::{Event, Level};
 use std::process;
 use sysinfo::{ProcessExt, Signal, SystemExt};
 
@@ -74,6 +75,7 @@ pub fn kill_rainway_processes() {
 /// returns an error for the condition that is not met.
 pub fn check_system_compatibility() -> Result<(), BootstrapError> {
     let system_info = get_system_info()?;
+
     if !system_info.is_x64 {
         return Err(BootstrapError::ArchitectureUnsupported);
     }

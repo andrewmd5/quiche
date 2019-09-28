@@ -1,40 +1,44 @@
 use fs_extra::dir::get_dir_content;
 use std::ffi::OsStr;
 use std::fs::{self, ReadDir};
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 
 /// checks if a directory contains all the files in a vector
-pub fn dir_contains_all_files(dir_path: &String, files: &Vec<String>) -> bool {
+pub fn dir_contains_all_files(dir_path: &Path, files: &Vec<String>) -> bool {
     match get_dir_files(dir_path) {
-        Some(dir_files) => files.iter().all(|file| dir_files.contains(file)),
-        None => false,
+        Ok(dir_files) => files.iter().all(|file| dir_files.contains(file)),
+        Err(e) => false,
     }
 }
 
-pub fn get_total_files(input: &String) -> Option<u64> {
-    get_dir_files(&input).map(|files| files.len() as u64)
+pub fn get_total_files(input: &Path) -> Result<u64, Error> {
+    get_dir_files(&input)
+        .map(|files| files.len() as u64)
+        .map_err(|e| e)
 }
 
 /// returns a vector of all the files in a folder.
-pub fn get_dir_files(input: &String) -> Option<Vec<String>> {
-    let input_path = Path::new(input);
-    if !input_path.exists() {
-        return None;
+pub fn get_dir_files(input: &Path) -> Result<Vec<String>, Error> {
+    if !input.exists() {
+        return Err(Error::new(
+            ErrorKind::NotFound,
+            format!("The given input path does not exist: {}", input.display()),
+        ));
     }
-    let dir_content = match get_dir_content(input_path) {
-        Ok(dc) => dc,
-        Err(_e) => return None,
+    let dir_content = match get_dir_content(input) {
+        Ok(f) => f,
+        Err(e) => return Err(Error::new(ErrorKind::Interrupted, e.to_string())),
     };
     let dir_files: Vec<String> = (&dir_content.files)
         .into_iter()
-        .map(|file| file.replace(input, ""))
+        .map(|file| file.replace(input.to_str().unwrap(), ""))
         .collect();
-    Some(dir_files)
+    Ok(dir_files)
 }
 
 /// a hacky way to get just the file name for root directory files
-pub fn get_filename(path: &PathBuf) -> String {
+pub fn get_filename(path: &Path) -> String {
     let ext = String::from(
         path.extension()
             .unwrap_or(OsStr::new(""))
@@ -52,6 +56,41 @@ pub fn get_filename(path: &PathBuf) -> String {
         false => ".",
     };
     format!("{}{}{}", stem, dot, ext)
+}
+
+/// normalizes Windows paths so they don't fucking blow up
+pub fn to_slash(buf: &Path) -> PathBuf {
+    let is_dir = buf.is_dir();
+    use std::path;
+    let components = buf
+        .components()
+        .map(|c| match c {
+            path::Component::RootDir => Some(""),
+            path::Component::CurDir => Some("."),
+            path::Component::ParentDir => Some(".."),
+            path::Component::Prefix(ref p) => p.as_os_str().to_str(),
+            path::Component::Normal(ref s) => s.to_str(),
+        })
+        .collect::<Option<Vec<_>>>();
+
+    let mut raw = components
+        .map(|v| {
+            if v.len() == 1 && v[0].is_empty() {
+                // Special case for '/'
+                "/".to_string()
+            } else {
+                v.join("/")
+            }
+        })
+        .unwrap_or_default();
+
+    if raw.is_empty() {
+        return PathBuf::new();
+    }
+    if is_dir && raw.ends_with("") {
+        raw.push('/');
+    }
+    PathBuf::from(raw)
 }
 
 /// Deletes all the files in a directory

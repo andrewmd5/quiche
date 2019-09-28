@@ -3,12 +3,295 @@ pub mod io;
 pub mod net;
 pub mod os;
 
+pub mod bakery {
+
+    use crate::etc::constants::BootstrapError;
+    use crate::io::disk::{delete_dir_contents, get_dir_files, to_slash};
+    use crate::io::hash::sha_256;
+    use crate::io::zip::zip_with_progress;
+    use crate::updater::{
+        get_base_release_url, get_releases, Branch, Installer, Manifest, Package, ReleaseBranch,
+        Releases,
+    };
+    use fs_extra::file::{copy, CopyOptions};
+    use serde::Deserialize;
+    use std::fs::read_dir;
+    use std::io::{Error, ErrorKind};
+    use std::{
+        fs::{create_dir_all, read_to_string, write},
+        path::{Path, PathBuf},
+    };
+
+    /// A recipe is used to craft a release from a given build.
+    #[derive(Deserialize)]
+    pub struct Recipe {
+        /// the version of the release
+        pub version: String,
+        /// the full path to the MSI or EXE installer for the parent application.
+        pub installer_path: PathBuf,
+        /// the directory path to the files that makeup the release version.
+        /// usually this will be digtally signed artifacts.
+        pub package_source: PathBuf,
+        /// the destination branch the release will be under
+        pub branch: ReleaseBranch,
+        /// the directory baked files will be written too. You should keep this the same between
+        /// branches and versions. do not include the version number or branch name.
+        pub output_dir: PathBuf,
+    }
+
+    pub struct Dinner {
+        /// the baked Manifest of the target release which will serve as our
+        /// manifest.toml in the final build
+        pub manifest: Manifest,
+        /// the baked Branch of the target release which will be blitted
+        /// into Releases.toml
+        pub branch: Branch,
+    }
+
+    impl Recipe {
+        /// prepares a given recipe by checking that the provided flags are valid.
+        /// it will also fix the slashes of paths, adding trailing slashes if needed.
+        pub fn prepare(&mut self) -> Result<(), Error> {
+            if self.version.is_empty() {
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    "The recipe version flag cannot be empty.",
+                ));
+            }
+            self.installer_path = to_slash(&self.installer_path);
+            if !self.installer_path.is_file() || !self.installer_path.exists() {
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    "The installer present in the recipe does not exist.",
+                ));
+            }
+            self.package_source = to_slash(&self.package_source);
+            if !self.package_source.is_dir() || !self.package_source.exists() {
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    "The recipe package source does not exist.",
+                ));
+            }
+            self.output_dir.push(&self.branch.to_string());
+            self.output_dir.push(&self.version);
+            self.output_dir = to_slash(&self.output_dir);
+            if !self.output_dir.exists() {
+                create_dir_all(&self.output_dir)?;
+                log::info!("created directory {}", &self.output_dir.display());
+            } else {
+                let output_dir = read_dir(&self.output_dir);
+                delete_dir_contents(output_dir, &vec![])?;
+                log::info!(
+                    "deleted previous release found inside {}",
+                    &self.output_dir.display()
+                );
+            }
+            Ok(())
+        }
+
+        /// bakes a release by packaging and hashing all the relevant files
+        /// once all the ingredients have been handled properly a Dinner struct
+        /// is returned which contains the to-be released Manifest and Branch.
+        pub fn bake(&self) -> Result<Dinner, BootstrapError> {
+            log::info!(
+                "building a release for {} on branch {}",
+                self.version,
+                self.branch
+            );
+
+            let branch_url = format!(
+                "{}/{}/{}",
+                get_base_release_url(),
+                self.branch.to_string(),
+                self.version
+            );
+
+            log::debug!("branch_url == {}", branch_url);
+
+            // lets make the package
+            log::info!("hashing the installer...");
+
+            let installer_hash = sha_256(&self.installer_path).unwrap_or_default();
+            if installer_hash.is_empty() {
+                return Err(BootstrapError::RecipeBakeFailure(format!(
+                    "Installer hash for {} is empty.",
+                    self.installer_path.display()
+                )));
+            }
+
+            let installer_url = format!("{}/installer.exe", branch_url);
+
+            log::debug!(
+                "installer_url == {}, installer_hash == {}",
+                installer_url,
+                installer_hash
+            );
+
+            log::info!("packaging the release files...");
+
+            let func_test = |file: String| {
+                log::info!("[DONE] {}", file);
+            };
+
+            let mut package_path = self.output_dir.clone();
+            package_path.push("package.zip");
+
+            if let Err(e) = zip_with_progress(&self.package_source, &package_path, func_test) {
+                return Err(BootstrapError::RecipeBakeFailure(format!(
+                    "Issue packaging {} due to unknown exception: {}",
+                    &self.package_source.display(),
+                    e
+                )));
+            }
+            log::info!("hashing the release package...");
+
+            let package_hash = sha_256(&package_path).unwrap_or_default();
+            if package_hash.is_empty() {
+                return Err(BootstrapError::RecipeBakeFailure(format!(
+                    "package hash for {} is empty.",
+                    package_path.display()
+                )));
+            }
+
+            let package_url = format!("{}/package.zip", branch_url);
+
+            log::debug!(
+                "package_url == {}, package_hash == {}",
+                package_url,
+                package_hash
+            );
+
+            let files = get_dir_files(&self.package_source)?;
+
+            if files.len() == 0 {
+                return Err(BootstrapError::RecipeBakeFailure(format!(
+                    "The package source {} contains zero files or we were unable to access the directory.",  
+                    &self.package_source.display()
+                )));
+            }
+
+            log::info!(
+                "found {} files which will be included in this release.",
+                files.len()
+            );
+            Ok(Dinner {
+                branch: Branch {
+                    manifest_url: format!("{}/manifest.toml", branch_url),
+                    version: self.version.clone(),
+                },
+                manifest: Manifest {
+                    version: self.version.clone(),
+                    package: Package {
+                        files: files,
+                        hash: package_hash,
+                        url: package_url,
+                    },
+                    installer: Installer {
+                        url: installer_url,
+                        hash: installer_hash,
+                    },
+                },
+            })
+        }
+
+        /// using the baked Manifest and Branch structures we can prepare a release.
+        /// an attempt is made to fetch the already published Releases.toml file
+        /// so that it can be updated. If fetching it fails, then a brand new Releases file is made.
+        /// all the relevant files will be written to their output once this function completes.
+        pub fn stage(&self, dinner: Dinner) -> Result<(), BootstrapError> {
+            log::info!(
+                "attempting to stage the release for version {} on {}.",
+                self.version,
+                self.branch
+            );
+            let mut releases = match get_releases() {
+                Ok(r) => {
+                    log::info!("using default release host.");
+                    r
+                }
+                Err(e) => {
+                    log::warn!("Unable to fetch remote releases. {}", e);
+                    log::warn!("Creating a Release file from scratch.");
+                    Releases::default()
+                }
+            };
+            log::info!("setting up the {} branch.", self.branch);
+            match self.branch {
+                ReleaseBranch::Stable => releases.stable = dinner.branch,
+                ReleaseBranch::Beta => releases.beta = dinner.branch,
+                ReleaseBranch::Nightly => releases.nightly = dinner.branch,
+            }
+            let releases_encoded = match toml::to_string(&releases) {
+                Ok(c) => c,
+                Err(e) => return Err(BootstrapError::RecipeStageFailure(e.to_string())),
+            };
+            log::debug!("encoded releases \n\n{}", &releases_encoded);
+            let mut release_path = match self.output_dir.parent().unwrap().parent() {
+                Some(p) => p.to_path_buf(),
+                None => {
+                    return Err(BootstrapError::RecipeStageFailure(
+                        "Cannot locate parent for output directory.".to_string(),
+                    ))
+                }
+            };
+            release_path.push("Releases.toml");
+            write(&release_path, &releases_encoded)?;
+            log::info!("wrote Releases.toml to {}", &release_path.display());
+
+            let manifest_encoded = match toml::to_string(&dinner.manifest) {
+                Ok(c) => c,
+                Err(e) => return Err(BootstrapError::RecipeStageFailure(e.to_string())),
+            };
+            log::debug!("encoded manifest \n\n{}", &manifest_encoded);
+
+            let mut manifest_path = self.output_dir.clone();
+            manifest_path.push("manifest.toml");
+            write(&manifest_path, &manifest_encoded)?;
+            log::info!("wrote release manifest to {}", &manifest_path.display());
+
+            let mut options = CopyOptions::new();
+            options.overwrite = true;
+
+            let mut copied_installer_path = self.output_dir.clone();
+            copied_installer_path.push("installer.exe");
+
+            match copy(&self.installer_path, &copied_installer_path, &options) {
+                Ok(_c) => _c,
+                Err(e) => return Err(BootstrapError::RecipeStageFailure(e.to_string())),
+            };
+            log::info!(
+                "copied the full installer to to {}",
+                &copied_installer_path.display()
+            );
+
+            Ok(())
+        }
+    }
+
+    impl From<&Path> for Recipe {
+        /// turn a raw TOML string into a Recipe struct
+        fn from(recipe_path: &Path) -> Self {
+            if !recipe_path.exists() {
+                panic!("The recipe at {} does not exist.", recipe_path.display());
+            }
+            if !recipe_path.is_file() {
+                panic!("The provided recipe path is not a file.");
+            }
+            let contents =
+                read_to_string(recipe_path).expect("Something went wrong reading the recipe file");
+            if contents.is_empty() {
+                panic!("The provided recipe at {} is empty.", recipe_path.display());
+            }
+            let recipe = toml::from_str::<Recipe>(&contents).expect("Unable to parse recipe");
+            recipe
+        }
+    }
+}
+
 pub mod updater {
 
     use crate::etc::constants::BootstrapError;
-    use crate::io::disk::{
-        delete_dir_contents, dir_contains_all_files, get_dir_files, get_filename,
-    };
+    use crate::io::disk::{delete_dir_contents, dir_contains_all_files, get_filename};
     use crate::io::hash::sha_256;
     use crate::io::zip::unzip;
     use crate::net::http::{download_file, download_toml};
@@ -16,8 +299,9 @@ pub mod updater {
     use serde::{Deserialize, Serialize};
 
     use std::{
-        env::temp_dir,
+        env::{temp_dir, var},
         fs::{read_dir, remove_dir_all},
+        path::Path,
         sync::{Arc, RwLock},
         thread,
         time::Duration,
@@ -35,7 +319,7 @@ pub mod updater {
         Patch,
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Deserialize)]
     pub enum ReleaseBranch {
         Stable,
         Beta,
@@ -68,59 +352,61 @@ pub mod updater {
 
     #[derive(Default)]
     pub struct ActiveUpdate {
+        /// identifies if the current update is a full install or a patch.
         pub update_type: UpdateType,
+        /// identifies the branch we are updating from.
         pub branch: ReleaseBranch,
+        /// the manifest of the current update which contains information
+        /// on the installer, files, and package hashes.
         pub manifest: Manifest,
+        /// the temporary file path where downloaded packages will be written.
         pub temp_name: String,
+        /// the currently installed version of the parent applicaton.
         pub current_version: String,
+        /// the directory path where the parent application is installed
+        /// and updates need to be written.
         pub install_path: String,
     }
 
     impl ActiveUpdate {
-
         /// fetches and sets the manifest for a given branch
-        pub fn get_manifest(&mut self, branch: ReleaseBranch) -> Result<(), BootstrapError> {
-            let err = Err(BootstrapError::ReleaseLookupFailed);
-            if let Some(releases) = get_releases() {
-                let manifest_url = match branch {
-                    ReleaseBranch::Stable => &releases.stable.manifest_url,
-                    ReleaseBranch::Beta => &releases.beta.manifest_url,
-                    ReleaseBranch::Nightly => &releases.nightly.manifest_url,
-                };
-                if manifest_url.is_empty() {
-                    sentry::capture_message(
-                        format!("Manifest URL missing the {} branch.", branch).as_str(),
-                        sentry::Level::Error,
-                    );
-                    return err;
+        pub fn get_manifest(&mut self, branch: &ReleaseBranch) -> Result<(), BootstrapError> {
+            let releases = get_releases()?;
+            let manifest_url = match branch {
+                ReleaseBranch::Stable => &releases.stable.manifest_url,
+                ReleaseBranch::Beta => &releases.beta.manifest_url,
+                ReleaseBranch::Nightly => &releases.nightly.manifest_url,
+            };
+            if manifest_url.is_empty() {
+                return Err(BootstrapError::ReleaseLookupFailed(format!(
+                    "Manifest URL missing the {} branch.",
+                    branch
+                )));
+            }
+            println!("pulling the latest release for the {:?} branch", branch);
+            match download_toml::<Manifest>(&manifest_url) {
+                Ok(m) => {
+                    self.manifest = m;
+                    return Ok(());
                 }
-
-                println!("pulling the latest release for the {:?} branch", branch);
-                match download_toml::<Manifest>(&manifest_url) {
-                    Ok(m) => {
-                        self.manifest = m;
-                        return Ok(());
-                    }
-                    Err(e) => {
-                        sentry::capture_message(
-                            format!("Failed to fetch branch {}: {}", branch, e).as_str(),
-                            sentry::Level::Error,
-                        );
-                        // This is an unrecoverable issue, so we return None
-                        // and present a generic error message.
-                        return err;
-                    }
+                Err(e) => {
+                    return Err(BootstrapError::ReleaseLookupFailed(format!(
+                        "Failed to fetch branch {}. {}",
+                        branch, e
+                    )));
                 }
             }
-            err
         }
 
+        /// returns a list of all the files inside of a releases package.zip
         pub fn get_package_files(&self) -> Vec<String> {
             self.manifest.package.files.clone()
         }
+        /// returns the temporary file path where downloaded packages will be written.
         pub fn get_temp_name(&self) -> String {
             self.temp_name.clone()
         }
+        /// returns the remote version
         pub fn get_version(&self) -> String {
             self.manifest.version.clone()
         }
@@ -131,24 +417,24 @@ pub mod updater {
             }
             .to_string()
         }
+
         pub fn get_url(&self) -> String {
             match self.update_type {
-                UpdateType::Install => self.manifest.installer.url.as_str(),
-                UpdateType::Patch => self.manifest.package.url.as_str(),
+                UpdateType::Install => self.manifest.installer.url.clone(),
+                UpdateType::Patch => self.manifest.package.url.clone(),
             }
-            .to_string()
         }
         pub fn get_hash(&self) -> String {
             match self.update_type {
-                UpdateType::Install => self.manifest.installer.hash.as_str(),
-                UpdateType::Patch => self.manifest.package.hash.as_str(),
+                UpdateType::Install => self.manifest.installer.hash.clone(),
+                UpdateType::Patch => self.manifest.package.hash.clone(),
             }
-            .to_string()
         }
         /// creates a temporary file name for the update.
         pub fn set_temp_file(&mut self) {
             self.temp_name = format!("{}{}", self.get_hash(), self.get_ext())
         }
+
         /// Checks if the current installation is out of date.
         /// It does this by first checking if all the files listed in the manifest are present on disk.
         /// If all files are present, it then compares the remote and local version.
@@ -178,7 +464,7 @@ pub mod updater {
         pub manifest_url: String,
     }
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, Default)]
     pub struct Releases {
         /// The stable branch, used by default.
         pub stable: Branch,
@@ -224,22 +510,25 @@ pub mod updater {
         pub files: Vec<String>,
     }
 
-    /// fetches all the available releases for each branch.
-    pub fn get_releases() -> Option<Releases> {
-        match download_toml::<Releases>(env!("RAINWAY_RELEASE_URL")) {
-            Ok(r) => return Some(r),
-            Err(e) => {
-                // Send just in case its not a network error.
-                sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
-                // This is an unrecoverable issue.
-                return None;
-            }
+    pub fn get_base_release_url() -> String {
+        env!("BASE_RELEASE_URL").to_string()
+    }
+
+    fn get_release_url() -> String {
+        if let Ok(release_override) = var("RELEASE_OVERRIDE") {
+            return release_override;
         }
+        format!("{}{}", env!("BASE_RELEASE_URL"), env!("RELEASE_PATH"))
+    }
+
+    /// fetches all the available releases for each branch.
+    pub fn get_releases() -> Result<Releases, BootstrapError> {
+        download_toml::<Releases>(&get_release_url())
     }
 
     /// checks if all the files present in a vector exist in a given directory.
     fn validate_files(input: &String, target_files: &Vec<String>) -> bool {
-        dir_contains_all_files(input, target_files)
+        dir_contains_all_files(&Path::new(input), target_files)
     }
 
     /// checks if the downloaded file hash matches that of the one in the manifest.
@@ -346,18 +635,14 @@ pub mod updater {
             return Err(BootstrapError::InstallationFailed(backup_error).to_string());
         }
         //stage the update
-        match unzip(&download_path, &update_staging_path) {
-            Ok(_o) => _o,
-            Err(e) => {
-                return Err(BootstrapError::InstallationFailed(format!(
-                    "Unable to extract update to {} due to issue: {}",
-                    update_staging_path.display(),
-                    e
-                ))
-                .to_string())
-            }
+        if let Err(e) = unzip(&download_path, &update_staging_path) {
+            return Err(BootstrapError::InstallationFailed(format!(
+                "Unable to extract update to {} due to issue: {}",
+                update_staging_path.display(),
+                e
+            ))
+            .to_string());
         }
-
         let current_exe = match std::env::current_exe() {
             Ok(exe) => get_filename(&exe),
             Err(e) => {
@@ -387,11 +672,6 @@ pub mod updater {
         //apply the update
         match move_dir(&update_staging_path, &install_path, &options) {
             Ok(_o) => {
-                if let Some(fs) = get_dir_files(&install_path) {
-                    for f in fs {
-                        println!("{}", f);
-                    }
-                }
                 return Ok("'Rainway Updated!'".to_string());
             }
             Err(e) => {
