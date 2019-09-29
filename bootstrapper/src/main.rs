@@ -128,13 +128,15 @@ fn run() -> Result<(), BootstrapError> {
         .size(600, 380)
         .debug(true)
         .user_data(0)
+        .borderless(true)
         .resizable(false)
         .invoke_handler(|_webview, arg| handler(_webview, arg, &update))
         .build()
     {
         Ok(v) => v,
         Err(e) => return Err(BootstrapError::WebView(e.to_string())),
-    };
+    }; 
+
 
     match webview.run() {
         Ok(_v) => return Ok(()),
@@ -159,7 +161,10 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         }
         "exit" => {
             std::process::exit(0);
-        }
+        },
+        "retry" => {
+           log::debug!("Not here.");
+        },
         _ => {
             if arg.contains("log|") {
                 log::debug!("[Javascript] {}", arg.split('|').collect::<Vec<&str>>()[1]);
