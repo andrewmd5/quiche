@@ -72,7 +72,6 @@ fn main() {
             clap::Arg::with_name("verbose")
                 .short("v")
                 .long("verbose")
-                .multiple(true)
                 .help("Increases logging verbosity each use for up to 3 times"),
         )
         .arg(
@@ -81,11 +80,6 @@ fn main() {
                 .value_name("URL")
                 .help("Overrides the default release URL.")
                 .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("l")
-                .short("l")
-                .help("Sets the level of verbosity"),
         )
         .get_matches();
 
@@ -110,13 +104,9 @@ fn main() {
 
     let mut recipe = Recipe::from(recipe_path);
     log::info!("read Quiche recipe from {}", recipe_path.display());
-
-    match recipe.prepare() {
-        Ok(_o) => _o,
-        Err(e) => {
-            log::error!("the recipe ingredients could not be prepared. {}", e);
-            panic!("preparations failed.");
-        }
+    if let Err(e) = recipe.prepare() {
+        log::error!("the recipe ingredients could not be prepared. {}", e);
+        panic!("preparations failed.");
     }
     log::info!("Quiche recipe prepared. attempted to bake.");
 
@@ -128,13 +118,11 @@ fn main() {
         }
     };
 
-    match recipe.stage(dinner) {
-        Ok(_o) => log::info!("dinner is served! the release was successfully baked."),
-        Err(e) => {
-            log::error!("the recipe could not be staged. {}", e);
-            panic!("stage failure.");
-        }
+    if let Err(e) = recipe.stage(dinner) {
+       log::error!("the recipe could not be staged. {}", e);
+        panic!("stage failure.");
     }
+    log::info!("dinner is served! the release was successfully baked.");
 }
 
 const LOGO: &str = r#"

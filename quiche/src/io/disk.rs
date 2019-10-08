@@ -58,7 +58,8 @@ pub fn get_filename(path: &Path) -> String {
     format!("{}{}{}", stem, dot, ext)
 }
 
-/// normalizes Windows paths so they don't fucking blow up
+/// without normalizing the paths to files/directories, Rust will be unable
+/// to deep copy nested directories properly.
 pub fn to_slash(buf: &Path) -> PathBuf {
     let is_dir = buf.is_dir();
     use std::path;
