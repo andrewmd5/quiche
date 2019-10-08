@@ -354,6 +354,7 @@ pub struct IconColor {
 }
 
 /// An entry in an Icon directory
+#[derive(Eq, Clone)]
 pub struct IconDirEntry {
     /// width of the icon
     pub width: u8,
@@ -367,6 +368,24 @@ pub struct IconDirEntry {
     /// the number of bits per pixel
     bits_per_pixel: u16,
     data: Vec<u8>,
+}
+
+impl Ord for IconDirEntry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.height.cmp(&other.height)
+    }
+}
+
+impl PartialOrd for IconDirEntry {
+    fn partial_cmp(&self, other: &IconDirEntry) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for IconDirEntry {
+    fn eq(&self, other: &Self) -> bool {
+        self.height == other.height
+    }
 }
 
 impl IconDirEntry {
@@ -482,6 +501,18 @@ impl IconDir {
             resource_type: resource_type,
             entries: entries,
         })
+    }
+    /// removes all icon entries from the directory except for the very best.
+    /// like no ico ever was. to catch the width is my real test, and to filter is my cause.
+    pub fn filter_lq_entries(&mut self) {
+        if let Some(best) = self.entries.iter().max() {
+            self.entries = self
+                .entries
+                .iter()
+                .filter(|e| e.width == best.width && e.height == best.height)
+                .cloned()
+                .collect();
+        }
     }
 }
 
