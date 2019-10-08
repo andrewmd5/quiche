@@ -210,6 +210,7 @@ impl IconImage {
         let depth = bitmap.get_depth()?;
 
         let mut colors = Vec::<IconColor>::with_capacity(depth.num_colors());
+        // reads the color table which is a RGBQUAD structure
         for _ in 0..depth.num_colors() {
             let blue = data.read_u8(&mut cursor)?;
             let green = data.read_u8(&mut cursor)?;
@@ -227,6 +228,7 @@ impl IconImage {
         let row_data_size = (bitmap.width * bitmap.bits_per_pixel as u32 + 7) / 8;
         let row_padding_size = ((row_data_size + 3) / 4) * 4 - row_data_size;
 
+        // reads the stored image from the bottom up.
         for row in 0..bitmap.height {
             let mut start = (4 * (bitmap.height - row - 1) * bitmap.width) as usize;
             match depth {
@@ -301,6 +303,7 @@ impl IconImage {
                 }
                 ColorDepth::ThirtyTwo => {
                     for _ in 0..bitmap.width {
+                        //RGBQUAD 
                         let blue = data.read_u8(&mut cursor)?;
                         let green = data.read_u8(&mut cursor)?;
                         let red = data.read_u8(&mut cursor)?;
@@ -317,11 +320,12 @@ impl IconImage {
                 cursor += row_padding_size as usize;
             }
         }
-
+        // Read the AND mask after base color data - 1 BIT MASK
         if depth != ColorDepth::ThirtyTwo {
             let row_mask_size = (bitmap.width + 7) / 8;
             let row_padding_size = ((row_mask_size + 3) / 4) * 4 - row_mask_size;
             for row in 0..bitmap.height {
+                //32 bit boundary
                 let mut start = (4 * (bitmap.height - row - 1) * bitmap.width) as usize;
                 let mut col = 0;
                 for _ in 0..row_mask_size {
@@ -502,17 +506,15 @@ impl IconDir {
             entries: entries,
         })
     }
-    /// removes all icon entries from the directory except for the very best.
+    /// removes all icon entries from the directory except for the very best
     /// like no ico ever was. to catch the width is my real test, and to filter is my cause.
-    pub fn filter_lq_entries(&mut self) {
-        if let Some(best) = self.entries.iter().max() {
-            self.entries = self
-                .entries
-                .iter()
-                .filter(|e| e.width == best.width && e.height == best.height)
-                .cloned()
-                .collect();
-        }
+    pub fn filter_for(&mut self, width: u8, height: u8) {
+        self.entries = self
+            .entries
+            .iter()
+            .filter(|e| e.width == width && e.height == height)
+            .cloned()
+            .collect();
     }
 }
 

@@ -1,5 +1,5 @@
+use crate::io::ico::IcoError;
 use crate::updater::{ReleaseBranch, UpdateState, UpdateType};
-use crate::io::ico::{IcoError};
 use std::fmt;
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ pub enum BootstrapError {
     IOError(std::io::Error),
     WebView(String),
     ResourceLoadError(String),
-    IcoError(String)
+    IcoError(String),
 }
 
 #[allow(non_snake_case)]

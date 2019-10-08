@@ -382,7 +382,7 @@ pub mod updater {
                     branch
                 )));
             }
-           log::info!("pulling the latest release for the {:?} branch", branch);
+            log::info!("pulling the latest release for the {:?} branch", branch);
             match download_toml::<Manifest>(&manifest_url) {
                 Ok(m) => {
                     self.manifest = m;
@@ -604,7 +604,7 @@ pub mod updater {
         update_staging_path.push(format!("Rainway_Stage_{}", &version));
 
         log::debug!("update_staging_path == {}", &update_staging_path.display());
-        
+
         if update_staging_path.exists() {
             log::info!("update staging folder exist. attempting to clean.");
             if let Err(e) = remove_dir_all(&update_staging_path) {
@@ -689,7 +689,7 @@ pub mod updater {
             if let Ok(_e) = move_dir(&backup_path, &install_path, &options) {
                 log::warn!("rolled back update process.");
             } else {
-                 log::error!("failed to rollback update process.")
+                log::error!("failed to rollback update process.")
             }
             return Err(BootstrapError::InstallationFailed(delete_error).to_string());
         }
@@ -735,7 +735,7 @@ pub mod updater {
                     .to_string()
             });
         if let Ok(output) = &results {
-             log::info!("{}", output);
+            log::info!("{}", output);
         } else {
             log::warn!("No output");
         }

@@ -1,4 +1,4 @@
 pub mod disk;
 pub mod hash;
-pub mod zip;
 pub mod ico;
+pub mod zip;
