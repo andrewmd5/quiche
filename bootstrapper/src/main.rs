@@ -10,7 +10,7 @@ use rainway::{
     get_installed_version, is_installed, kill_rainway_processes, launch_rainway,
 };
 
-use quiche::updater::{get_branch, ActiveUpdate, UpdateType};
+use quiche::updater::{ActiveUpdate, UpdateType};
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
 use ui::window::set_dpi_aware;
@@ -30,6 +30,8 @@ fn main() -> Result<(), BootstrapError> {
     if !cfg!(debug_assertions) && is_compiled_for_64_bit() {
         panic!("Build against i686-pc-windows-msvc for production releases.")
     }
+    let verbosity = 0;
+    setup_logging(verbosity).expect("failed to initialize logging.");
 
     if let Err(e) = run() {
         match e {
@@ -48,12 +50,14 @@ fn main() -> Result<(), BootstrapError> {
 
 fn run() -> Result<(), BootstrapError> {
     if let Err(e) = error_on_duplicate_session() {
+        log::error!("found another bootstrapper session. killing session.");
         return Err(e);
     }
 
     kill_rainway_processes();
 
     let rainway_installed = is_installed()?;
+    log::info!("Rainway installed: {}", rainway_installed);
     let mut update = ActiveUpdate::default();
     if !rainway_installed {
         update.update_type = UpdateType::Install;
@@ -75,31 +79,42 @@ fn run() -> Result<(), BootstrapError> {
         };
     }
 
+    log::info!("update type: {}", update.update_type);
+
     if !rainway_installed {
+        log::info!("checking system compatibility.");
         check_system_compatibility()?;
     }
+
     //regardless of whether we need to update or install, we need the latest branch.
-    match get_branch(get_config_branch()) {
-        Some(b) => update.branch = b,
-        None => {
-            if rainway_installed {
-                println!("Unable to check for latest branch. Starting current version.");
-                launch_rainway();
-                return Ok(());
-            } else {
-                return Err(BootstrapError::ReleaseLookupFailed);
-            }
+    let config_branch = get_config_branch();
+    log::info!("user branch: {}", config_branch);
+    if let Err(e) = update.get_manifest(&config_branch) {
+        if rainway_installed {
+            log::error!("unable to check for latest branch. starting currently installed version.");
+            launch_rainway();
+            sentry::capture_message(
+                format!("Failed to fetch branch {}. {}", config_branch, e).as_str(),
+                sentry::Level::Error,
+            );
+            return Ok(());
+        } else {
+            return Err(e);
         }
     }
-    update.temp_name = format!("{}{}", update.get_hash(), update.get_ext());
+    update.set_temp_file();
+    log::debug!("temp file name: {}", update.temp_name);
+
     //check if Rainway requires an update if it's installed
     if rainway_installed {
+        log::info!("validating Rainway installation.");
         let valid = update.validate();
         if valid {
-            println!("Rainway is not outdated, starting.");
+            log::info!("Rainway is not outdated, starting.");
             launch_rainway();
             return Ok(());
         }
+        log::warn!("the current Rainway installation requires an update.");
     }
 
     set_dpi_aware();
@@ -113,13 +128,15 @@ fn run() -> Result<(), BootstrapError> {
         .size(600, 380)
         .debug(true)
         .user_data(0)
+        .borderless(true)
         .resizable(false)
         .invoke_handler(|_webview, arg| handler(_webview, arg, &update))
         .build()
     {
         Ok(v) => v,
         Err(e) => return Err(BootstrapError::WebView(e.to_string())),
-    };
+    }; 
+
 
     match webview.run() {
         Ok(_v) => return Ok(()),
@@ -142,16 +159,70 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         "launch" => {
             launch_and_close(webview);
         }
-        "restart" => {
+        "exit" => {
             std::process::exit(0);
-        }
+        },
+        "retry" => {
+           log::debug!("Not here.");
+        },
         _ => {
             if arg.contains("log|") {
-                println!("[Javascript] {}", arg.split('|').collect::<Vec<&str>>()[1]);
+                log::debug!("[Javascript] {}", arg.split('|').collect::<Vec<&str>>()[1]);
             } else {
+                log::warn!("{}", arg);
                 unimplemented!()
             }
         }
     }
+    Ok(())
+}
+
+fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
+    use fern::colors::{Color, ColoredLevelConfig};
+    use std::fs::File;
+    let colors = ColoredLevelConfig::new()
+        .trace(Color::BrightCyan)
+        .debug(Color::BrightMagenta)
+        .warn(Color::BrightYellow)
+        .info(Color::BrightGreen)
+        .error(Color::BrightRed);
+
+    let mut base_config = fern::Dispatch::new();
+
+    base_config = match verbosity {
+        0 => base_config.level(log::LevelFilter::Debug).level_for("hyper", log::LevelFilter::Info).level_for("tokio_reactor", log::LevelFilter::Info),
+        1 => base_config.level(log::LevelFilter::Info),
+        2 => base_config.level(log::LevelFilter::Warn),
+        _3_or_more => base_config.level(log::LevelFilter::Error),
+    };
+
+    // Separate file config so we can include colors in the terminal
+    let file_config = fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}][{}] {}",
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .chain(File::create(format!("{}.log",env!("CARGO_PKG_NAME")))?);
+
+    let stdout_config = fern::Dispatch::new()
+        .format(move |out, message, record| {
+            out.finish(format_args!(
+                "[{}][{}] {}",
+                record.target(),
+                colors.color(record.level()),
+                message
+            ))
+        })
+        .chain(std::io::stdout());
+
+    base_config
+        .chain(file_config)
+        .chain(stdout_config)
+        .apply()?;
+
     Ok(())
 }

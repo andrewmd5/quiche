@@ -9,5 +9,5 @@ edition = "2018"
 [dependencies]
 quiche = { path = "../quiche" }
 clap = "2.33.0"
-indicatif = "0.12.0"
-console = "0.9.0"
+log = "0.4.8"
+fern = { version = "0.5.8", features = ["colored"] }

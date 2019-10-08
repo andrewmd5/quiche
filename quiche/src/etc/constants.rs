@@ -3,6 +3,8 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum BootstrapError {
+    RecipeBakeFailure(String),
+    RecipeStageFailure(String),
     ElevationRequired,
     ServiceConnectionFailure,
     ServiceOpenFailure,
@@ -17,7 +19,7 @@ pub enum BootstrapError {
     HttpFailed(u16, String),
     LocalVersionMissing,
     InstallPathMissing,
-    ReleaseLookupFailed,
+    ReleaseLookupFailed(String),
     VersionCheckFailed(String, String),
     TomlParseFailure(String, String),
     BootstrapperExist,
@@ -34,6 +36,8 @@ pub enum BootstrapError {
 impl fmt::Display for BootstrapError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
+            BootstrapError::RecipeBakeFailure(ref s) => write!(f, "Unable to complete release build due to baking issue: {0}", s),
+            BootstrapError::RecipeStageFailure(ref s) => write!(f, "Unable to complete release build due to staging issue: {0}", s),
             BootstrapError::ElevationRequired => write!(f, "Please run the Rainway Boostrapper as Administrator."),
             BootstrapError::DismFailed(ref s) => write!(f, "DISM failed to launch: {0}", s),
             BootstrapError::ServiceConnectionFailure => write!(f, "Failed to connect to the system service manager."),
@@ -47,18 +51,18 @@ impl fmt::Display for BootstrapError {
             BootstrapError::RegistryValueNotFound(ref s) => write!(f, "An error occured accessing Windows Registry value: {}.", s),
             BootstrapError::HttpFailed(ref c, ref s) => write!(f, "Network connection issue occured accessing {}: {}.", s, c),
             BootstrapError::VersionCheckFailed(ref rv, ref lv) => write!(f, "Unable to compare remote version ({}) to installed version ({}).", rv, lv),
-            BootstrapError::TomlParseFailure(ref s, ref e) => write!(f, "An exception was encountered parsing a remote file {} due to: {}", s, e),
+            BootstrapError::TomlParseFailure(ref s, ref e) => write!(f, "An exception was encountered parsing a remote file located at {} due to {}", s, e),
             BootstrapError::SignatureMismatch => write!(f, "We were unable to validate the updates integrity. Please exit and try again."),
             BootstrapError::RemoteFileMissing(ref s) => write!(f, "The remote file requested ({}) is not present at the address provided.", s),
             BootstrapError::RemoteFileEmpty(ref s) => write!(f, "The remote file requested ({}) is has a zero byte length.", s),
             BootstrapError::InstallationFailed(ref s) => write!(f, "An error occured installing the latest update: {0}", s),
-            BootstrapError::RequestError(ref e) => write!(f, "An unknown network issue was encountered: {0}", e),
+            BootstrapError::RequestError(ref e) => write!(f, "An unknown network issue was encountered accessing {0}", e),
             BootstrapError::IOError(ref e) => write!(f, "An unknown issue was encountered: {0}", e),
             BootstrapError::BootstrapperExist => write!(f, "Another instance of the Rainway Bootstrapper is already running."),
             BootstrapError::WebView(ref e) => write!(f, "An unknown UI issue was encountered: {0}", e),
             BootstrapError::LocalVersionMissing => write!(f, "Unable to locate the version of the currently intalled branch."),
             BootstrapError::InstallPathMissing => write!(f, "Unable to locate the installation path of the currently intalled branch."),
-            BootstrapError::ReleaseLookupFailed => write!(f, "Looks like something went wrong. We were unable to determine the latest Rainway release. Please exit and try again."),
+            BootstrapError::ReleaseLookupFailed(ref e) => write!(f, "Looks like something went wrong. We were unable to determine the latest Rainway release. Please exit and try again. \n\n {0}", e),
         }
     }
 }
@@ -77,6 +81,12 @@ impl From<String> for ReleaseBranch {
 impl From<&str> for ReleaseBranch {
     fn from(branch: &str) -> Self {
         ReleaseBranch::from(branch.to_string())
+    }
+}
+
+impl Default for ReleaseBranch {
+    fn default() -> ReleaseBranch {
+        ReleaseBranch::Stable
     }
 }
 

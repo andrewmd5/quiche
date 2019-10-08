@@ -1,5 +1,5 @@
 use std::fs::{create_dir_all, File};
-use std::io::{copy, Error, ErrorKind};
+use std::io::{copy, Error};
 use std::path::{Path, PathBuf};
 
 use crate::io::disk::get_dir_files;
@@ -8,19 +8,16 @@ use zip::result::ZipError;
 use zip::write::FileOptions;
 
 /// creates a zip file from a given directory
-pub fn zip_with_progress<F>(input: String, output: String, callback: F) -> Result<(), Error>
+pub fn zip_with_progress<F>(input: &PathBuf, output: &PathBuf, callback: F) -> Result<(), Error>
 where
     F: Fn(String),
 {
-    if !Path::new(&input).is_dir() {
+    if !&input.is_dir() {
         return Err(Error::from(ZipError::FileNotFound));
     }
-    let path = Path::new(&output);
-    let output_file = File::create(&path)?;
-    let files = match get_dir_files(&input) {
-        Some(f) => f,
-        None => return Err(Error::from(ErrorKind::NotFound)),
-    };
+
+    let output_file = File::create(&output)?;
+    let files = get_dir_files(&input)?;
     let mut zip = zip::ZipWriter::new(output_file);
     let options = FileOptions::default().compression_method(zip::CompressionMethod::Bzip2);
     let mut buffer = Vec::new();
@@ -50,16 +47,14 @@ pub fn unzip(input: &PathBuf, output: &PathBuf) -> Result<(), Error> {
         let mut outpath = output.clone();
         outpath.push(file.sanitized_name());
         if (&*file.name()).ends_with('/') {
-            #[cfg(debug_assertions)]
-            println!(
+            log::debug!(
                 "File {} extracted to \"{}\"",
                 i,
                 outpath.as_path().display()
             );
             create_dir_all(&outpath)?;
         } else {
-            #[cfg(debug_assertions)]
-            println!(
+            log::debug!(
                 "File {} extracted to \"{}\" ({} bytes)",
                 i,
                 outpath.as_path().display(),

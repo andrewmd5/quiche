@@ -1,0 +1,5 @@
+version = "2.0.0-bury"
+installer_path = "E:\\Dev\\bootstrapper\\dummy_server\\Installer_1.0.18.0.exe"
+package_source = "E:\\UpdateTest\\InstalledFolder"
+branch = "Stable"
+output_dir = "E:\\UpdateTest\\staging"

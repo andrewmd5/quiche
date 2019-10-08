@@ -3,9 +3,9 @@ version = "2.0.0"
 manifest_url = "http://local.vg:8080/2.0.0/manifest.toml"
 
 [beta]
-version = "0.0.0"
-manifest_url = ""
+version = "2.1.1-a84c3f16"
+manifest_url = "http://local.vg:8080/2.0.1-98d7cbe2/manifest.toml"
 
 [nightly]
-version = "0.0.0"
-manifest_url = ""
+version = "2.0.1-98d7cbe2"
+manifest_url = "http://local.vg:8080/2.0.1-98d7cbe2/manifest.toml"
