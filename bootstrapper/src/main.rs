@@ -36,7 +36,8 @@ fn main() -> Result<(), BootstrapError> {
     if !cfg!(debug_assertions) && is_compiled_for_64_bit() {
         panic!("Build against i686-pc-windows-msvc for production releases.")
     }
-    let verbosity = 0;
+    let verbosity = if !cfg!(debug_assertions) { 1 } else { 0 };
+    
     setup_logging(verbosity).expect("failed to initialize logging.");
 
     if let Err(e) = run() {
@@ -212,9 +213,7 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         "exit" => {
             std::process::exit(0);
         }
-        "retry" => {
-           
-        }
+        "retry" => {}
         _ => {
             if arg.contains("log|") {
                 log::debug!("[Javascript] {}", arg.split('|').collect::<Vec<&str>>()[1]);
