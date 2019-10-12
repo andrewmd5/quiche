@@ -29,6 +29,7 @@ pub struct InstalledApp {
     pub install_location: String,
     pub name: String,
     pub version: String,
+    pub branch: String,
 }
 
 #[derive(Clone, Default)]
@@ -137,11 +138,19 @@ pub fn needs_media_pack() -> Result<bool, BootstrapError> {
     Ok(true)
 }
 
-/// Returns a list of all the installed software for the current user.
+/// Returns a list of all the installed software for the current user and local machine
 pub fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let mut uninstallers = get_uninstallers_from_key(RegKey::predef(HKEY_CURRENT_USER))?;
+    uninstallers.extend(get_uninstallers_from_key(RegKey::predef(
+        HKEY_LOCAL_MACHINE,
+    ))?);
+    Ok(uninstallers)
+}
+
+/// Returns a list of uninstallers for a given registry key
+fn get_uninstallers_from_key(hkey: RegKey) -> Result<Vec<InstalledApp>, BootstrapError> {
     let u_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
-    let uninstall_key = match hkcu.open_subkey(u_key) {
+    let uninstall_key = match hkey.open_subkey(u_key) {
         Ok(u) => u,
         Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(u_key.to_string())),
     };
@@ -158,6 +167,7 @@ pub fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
             app.install_location = install_key.get_value("InstallLocation").unwrap_or_default();
             app.uninstall_string = install_key.get_value("UninstallString").unwrap_or_default();
             app.version = install_key.get_value("DisplayVersion").unwrap_or_default();
+            app.branch = install_key.get_value("QuicheBranch").unwrap_or_default();
 
             if !app.name.is_empty()
                 && !app.install_location.is_empty()

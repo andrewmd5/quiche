@@ -27,7 +27,7 @@ pub fn apply_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpd
     let error_callback = "updateFailed";
     let temp_file = update.get_temp_name();
     let version = update.get_version();
-    let install_path = update.install_path.clone();
+    let install_path = update.install_info.path.clone();
     let update_type = update.update_type.clone();
     run_async(
         webview,

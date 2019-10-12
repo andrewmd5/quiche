@@ -6,12 +6,11 @@ mod ui;
 
 use quiche::etc::constants::{is_compiled_for_64_bit, BootstrapError};
 use rainway::{
-    check_system_compatibility, error_on_duplicate_session, get_config_branch, get_install_path,
-    get_installed_version, is_installed, kill_rainway_processes, launch_rainway,
+    check_system_compatibility, error_on_duplicate_session, kill_rainway_processes, launch_rainway,
 };
 
 use quiche::io::ico::IconDir;
-use quiche::updater::{ActiveUpdate, UpdateType};
+use quiche::updater::{get_install_info, is_installed, ActiveUpdate, UpdateType};
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
 use ui::window::set_dpi_aware;
@@ -37,7 +36,7 @@ fn main() -> Result<(), BootstrapError> {
         panic!("Build against i686-pc-windows-msvc for production releases.")
     }
     let verbosity = if !cfg!(debug_assertions) { 1 } else { 0 };
-    
+
     setup_logging(verbosity).expect("failed to initialize logging.");
 
     if let Err(e) = run() {
@@ -63,27 +62,20 @@ fn run() -> Result<(), BootstrapError> {
 
     kill_rainway_processes();
 
+    let mut update = ActiveUpdate::default();
     let rainway_installed = is_installed()?;
     log::info!("Rainway installed: {}", rainway_installed);
-    let mut update = ActiveUpdate::default();
     if !rainway_installed {
         update.update_type = UpdateType::Install;
     } else {
+        update.install_info = match get_install_info() {
+            Ok(i) => i,
+            Err(e) => {
+                launch_rainway();
+                return Err(e);
+            }
+        };
         update.update_type = UpdateType::Patch;
-        update.current_version = match get_installed_version() {
-            Some(v) => v,
-            None => {
-                launch_rainway();
-                return Err(BootstrapError::LocalVersionMissing);
-            }
-        };
-        update.install_path = match get_install_path() {
-            Some(p) => p,
-            None => {
-                launch_rainway();
-                return Err(BootstrapError::InstallPathMissing);
-            }
-        };
     }
 
     log::info!("update type: {}", update.update_type);
@@ -94,9 +86,9 @@ fn run() -> Result<(), BootstrapError> {
     }
 
     //regardless of whether we need to update or install, we need the latest branch.
-    let config_branch = get_config_branch();
+    let config_branch = update.install_info.branch;
     log::info!("user branch: {}", config_branch);
-    if let Err(e) = update.get_manifest(&config_branch) {
+    if let Err(e) = update.get_manifest(config_branch) {
         if rainway_installed {
             log::error!("unable to check for latest branch. starting currently installed version.");
             launch_rainway();

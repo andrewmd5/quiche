@@ -303,7 +303,7 @@ impl IconImage {
                 }
                 ColorDepth::ThirtyTwo => {
                     for _ in 0..bitmap.width {
-                        //RGBQUAD 
+                        //RGBQUAD
                         let blue = data.read_u8(&mut cursor)?;
                         let green = data.read_u8(&mut cursor)?;
                         let red = data.read_u8(&mut cursor)?;

@@ -119,7 +119,7 @@ fn main() {
     };
 
     if let Err(e) = recipe.stage(dinner) {
-       log::error!("the recipe could not be staged. {}", e);
+        log::error!("the recipe could not be staged. {}", e);
         panic!("stage failure.");
     }
     log::info!("dinner is served! the release was successfully baked.");

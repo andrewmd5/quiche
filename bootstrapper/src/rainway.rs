@@ -1,40 +1,10 @@
 use crate::ui::messagebox::show_error;
 use quiche::etc::constants::BootstrapError;
 use quiche::os::service::start_service;
-use quiche::os::windows::get_uninstallers;
 use quiche::os::windows::{get_system_info, needs_media_pack};
-use quiche::updater::ReleaseBranch;
 
 use std::process;
 use sysinfo::{ProcessExt, Signal, SystemExt};
-
-/// Derives if Rainway is currently installed based on
-/// the list of installed applications for the current user.
-pub fn is_installed() -> Result<bool, BootstrapError> {
-    let uninstallers = get_uninstallers()?;
-    //wow, I was wondering if there was an `any` trait like LINQ
-    Ok(uninstallers.into_iter().any(|u| u.name == "Rainway"))
-}
-
-/// TODO pull this from the registry
-pub fn get_installed_version() -> Option<String> {
-    Some(String::from("1.0.0"))
-}
-
-/// TODO pull this from the registry
-/// THIS NEEDS A TRAILING SLASH
-pub fn get_install_path() -> Option<String> {
-    let registry_path = String::from("E:\\UpdateTest\\InstalledFolder\\");
-    Some(registry_path)
-}
-
-/// TODO do this at the end of a good update
-pub fn update_installed_version() {}
-
-/// TODO pull the branch a user has selcted from the registry.
-pub fn get_config_branch() -> ReleaseBranch {
-    ReleaseBranch::from("Stable".to_string())
-}
 
 /// returns an error if the bootstrapper is already open
 pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {

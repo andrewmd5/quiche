@@ -8,6 +8,7 @@ build = "build.rs"
 [quiche]
 base_release_url = "https://releases.rainway.com/quiche"
 release_path = "/Releases.toml"
+uninstall_key = "Rainway"
 
 [dependencies]
 windows-service = "0.2.0"
