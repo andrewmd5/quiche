@@ -11,6 +11,7 @@ release_path = "/Releases.toml"
 uninstall_key = "Rainway"
 
 [dependencies]
+walkdir = "2"
 windows-service = "0.2.0"
 zip = "0.5"
 fs_extra = { git = "https://github.com/webdesus/fs_extra.git" }
@@ -22,3 +23,4 @@ winreg = "0.6"
 regex = "1"
 log = "0.4.8"
 fern = "0.5.8"
+winapi = { version = "0.3.8", features = ["winuser", "tlhelp32", "handleapi"] }

@@ -3,6 +3,7 @@ use std::ffi::OsStr;
 use std::fs::{self, ReadDir};
 use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 /// checks if a directory contains all the files in a vector
 pub fn dir_contains_all_files(dir_path: &Path, files: &Vec<String>) -> bool {
@@ -91,28 +92,33 @@ pub fn to_slash(buf: &Path) -> PathBuf {
     if is_dir && raw.ends_with("") {
         raw.push('/');
     }
+    raw = raw.replace("//", "/");
     PathBuf::from(raw)
 }
 
 /// Deletes all the files in a directory
 /// Allows you to supply a vector of files you'd like to exclude for deletion
-pub fn delete_dir_contents(
-    read_dir_res: Result<ReadDir, Error>,
-    ignored: &Vec<String>,
-) -> Result<(), Error> {
-    for entry in read_dir_res? {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if path.is_dir() {
-                fs::remove_dir_all(path)?;
-            } else {
-                if (&ignored)
-                    .into_iter()
-                    .any(|v| v.clone() == get_filename(&path))
-                {
-                    continue;
-                }
-                fs::remove_file(path)?;
+pub fn delete_dir_contents(path: &PathBuf, ignored: &Vec<String>) -> Result<(), Error> {
+    for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+        if entry.path().exists() && !entry.path().is_dir() {
+            if (&ignored)
+                .into_iter()
+                .any(|v| v.clone() == get_filename(&entry.path()))
+            {
+                return Err(Error::last_os_error());
+            }
+            fs::remove_file(entry.path())?;
+        }
+    }
+    for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+        if entry.path().exists() && entry.path().is_dir() {
+            let is_empty = entry
+                .path()
+                .read_dir()
+                .map(|mut i| i.next().is_none())
+                .unwrap_or(false);
+            if is_empty {
+                fs::remove_dir_all(entry.path())?;
             }
         }
     }

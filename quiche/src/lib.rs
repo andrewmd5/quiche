@@ -15,7 +15,6 @@ pub mod bakery {
     };
     use fs_extra::file::{copy, CopyOptions};
     use serde::Deserialize;
-    use std::fs::read_dir;
     use std::io::{Error, ErrorKind};
     use std::{
         fs::{create_dir_all, read_to_string, write},
@@ -79,8 +78,7 @@ pub mod bakery {
                 create_dir_all(&self.output_dir)?;
                 log::info!("created directory {}", &self.output_dir.display());
             } else {
-                let output_dir = read_dir(&self.output_dir);
-                delete_dir_contents(output_dir, &vec![])?;
+                delete_dir_contents(&self.output_dir, &vec![])?;
                 log::info!(
                     "deleted previous release found inside {}",
                     &self.output_dir.display()
@@ -289,18 +287,19 @@ pub mod bakery {
 
 pub mod updater {
 
-    use crate::etc::constants::BootstrapError;
+    use std::fs::remove_dir_all;
+use crate::etc::constants::BootstrapError;
+    use crate::io::disk::to_slash;
     use crate::io::disk::{delete_dir_contents, dir_contains_all_files, get_filename};
     use crate::io::hash::sha_256;
     use crate::io::zip::unzip;
     use crate::net::http::{download_file, download_toml};
-    use crate::os::windows::{get_uninstallers, InstalledApp};
+    use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle};
     use fs_extra::dir::{copy, move_dir, CopyOptions};
     use serde::{Deserialize, Serialize};
 
     use std::{
         env::{temp_dir, var},
-        fs::{read_dir, remove_dir_all},
         path::{Path, PathBuf},
         sync::{Arc, RwLock},
         thread,
@@ -308,12 +307,14 @@ pub mod updater {
     };
 
     /// a struct that represents information found in the uninstall key registry entry
-    #[derive(Default)]
+    #[derive(Default, Clone)]
     pub struct InstallInfo {
         pub name: String,
         pub version: String,
         pub path: PathBuf,
         pub branch: ReleaseBranch,
+        pub registry_key: String,
+        pub registry_handle: RegistryHandle,
     }
 
     #[derive(Debug)]
@@ -359,7 +360,7 @@ pub mod updater {
         Done,
     }
 
-    #[derive(Default)]
+    #[derive(Default, Clone)]
     pub struct ActiveUpdate {
         /// identifies if the current update is a full install or a patch.
         pub update_type: UpdateType,
@@ -450,6 +451,63 @@ pub mod updater {
             }
             return &self.install_info.version == &self.manifest.version;
         }
+
+        /// updates the version string used by the Add/Remove program menu on Windows
+        /// we also use this to check if we need to update.
+        pub fn update_display_version(&self) {
+            if let Err(e) = set_uninstall_value(
+                "DisplayVersion",
+                &self.get_version(),
+                &self.install_info.registry_key,
+                self.install_info.registry_handle,
+            ) {
+                log::warn!("Unable to update display version: {}", e.to_string());
+            }
+        }
+
+        /// allows the release branch to be changed to a new preferred.
+        pub fn change_release_branch(&self, branch: ReleaseBranch) {
+            if let Err(e) = set_uninstall_value(
+                "QuicheBranch",
+                &branch.to_string(),
+                &self.install_info.registry_key,
+                self.install_info.registry_handle,
+            ) {
+                log::warn!("Unable to update release branch: {}", e.to_string());
+            }
+        }
+
+        /// retreives information on the current installed version of the parent software
+        pub fn get_install_info(&mut self) -> Result<(), BootstrapError> {
+            let uninstallers = get_uninstallers()?;
+            let uninstaller = match uninstallers
+                .into_iter()
+                .find(|u| u.name == env!("UNINSTALL_KEY"))
+            {
+                Some(u) => u,
+                None => return Err(BootstrapError::UninstallEntryMissing),
+            };
+            if uninstaller.version.is_empty() {
+                return Err(BootstrapError::LocalVersionMissing);
+            }
+            if uninstaller.install_location.is_empty() {
+                return Err(BootstrapError::InstallPathMissing);
+            }
+
+            let path = to_slash(&PathBuf::from(&uninstaller.install_location));
+            if !path.is_dir() || !path.exists() {
+                return Err(BootstrapError::InstallPathMissing);
+            }
+            self.install_info = InstallInfo {
+                version: uninstaller.version,
+                branch: ReleaseBranch::from(uninstaller.branch),
+                name: uninstaller.name,
+                path,
+                registry_key: uninstaller.key,
+                registry_handle: uninstaller.handle,
+            };
+            Ok(())
+        }
     }
 
     #[derive(Default, Copy, Clone)]
@@ -486,7 +544,7 @@ pub mod updater {
         }
     }
 
-    #[derive(Serialize, Deserialize, Default)]
+    #[derive(Serialize, Deserialize, Default, Clone)]
     pub struct Manifest {
         /// the version of the release
         pub version: String,
@@ -496,7 +554,7 @@ pub mod updater {
         pub installer: Installer,
     }
 
-    #[derive(Serialize, Deserialize, Default)]
+    #[derive(Serialize, Deserialize, Default, Clone)]
     pub struct Installer {
         /// The URL of the actual full installer.
         pub url: String,
@@ -504,7 +562,7 @@ pub mod updater {
         pub hash: String,
     }
 
-    #[derive(Serialize, Deserialize, Default)]
+    #[derive(Serialize, Deserialize, Default, Clone)]
     pub struct Package {
         /// The URL to the zip package containing all the new files.
         pub url: String,
@@ -536,15 +594,15 @@ pub mod updater {
     }
 
     /// checks if the downloaded file hash matches that of the one in the manifest.
-    pub fn verify(remote_hash: String, input_file: String) -> Result<String, String> {
+    pub fn verify(update: ActiveUpdate) -> Result<String, String> {
         let mut download_path = temp_dir();
-        download_path.push(input_file);
+        download_path.push(update.get_temp_name());
         log::info!("hashing {}", &download_path.display());
         let result: Result<String, String> = Ok(String::default());
         let err: Result<String, String> = Err(BootstrapError::SignatureMismatch.to_string());
         if let Some(local_hash) = sha_256(&download_path) {
             log::info!("finished hashing {}", &download_path.display());
-            match local_hash == remote_hash {
+            match local_hash == update.get_hash() {
                 true => return result,
                 false => return err,
             }
@@ -554,11 +612,7 @@ pub mod updater {
         }
     }
     /// downloads a file from an HTTP server with a progress callback.
-    pub fn download_with_callback<F>(
-        url: String,
-        output_file: String,
-        callback: F,
-    ) -> Result<String, String>
+    pub fn download_with_callback<F>(update: ActiveUpdate, callback: F) -> Result<String, String>
     where
         F: Fn(u64, u64) + Send + Sync + 'static,
     {
@@ -586,8 +640,8 @@ pub mod updater {
         });
         log::info!("download background thread started");
         let mut download_path = temp_dir();
-        download_path.push(output_file);
-        let results = download_file(local_arc, &url, &download_path)
+        download_path.push(update.get_temp_name());
+        let results = download_file(local_arc, &update.get_url(), &download_path)
             .map_err(|err| format!("{}", err))
             .map(|output| format!("{}", output));
 
@@ -598,15 +652,11 @@ pub mod updater {
 
     /// applies an update package from a remote manifest.
     /// if any issues are encountered then the process will be rolled back.  
-    pub fn apply(
-        install_path: PathBuf,
-        package_name: String,
-        version: String,
-    ) -> Result<String, String> {
+    pub fn apply(update: ActiveUpdate) -> Result<String, String> {
         let mut download_path = temp_dir();
-        download_path.push(package_name);
+        download_path.push(update.get_temp_name());
         let mut update_staging_path = temp_dir();
-        update_staging_path.push(format!("Rainway_Stage_{}", &version));
+        update_staging_path.push(format!("Rainway_Stage_{}", &update.get_version()));
 
         log::debug!("update_staging_path == {}", &update_staging_path.display());
 
@@ -624,7 +674,7 @@ pub mod updater {
         }
 
         let mut backup_path = temp_dir();
-        backup_path.push(format!("Rainway_Backup_{}", &version));
+        backup_path.push(format!("Rainway_Backup_{}", &update.get_version()));
 
         log::debug!("backup_path == {}", &backup_path.display());
         if backup_path.exists() {
@@ -645,7 +695,7 @@ pub mod updater {
         options.overwrite = true;
         //make the backup
         log::info!("attempting to create a backup of the current installation.");
-        if let Err(e) = copy(&install_path, &backup_path, &options) {
+        if let Err(e) = copy(&update.install_info.path, &backup_path, &options) {
             let backup_error = format!(
                 "Unable to backup installation to {}: {}",
                 backup_path.display(),
@@ -684,34 +734,34 @@ pub mod updater {
         //delete the install without deleting the root folder.
         log::info!(
             "attempting to delete all the contents of {}",
-            &install_path.display()
+            &update.install_info.path.display()
         );
-        let demo_dir = read_dir(&install_path);
-        if let Err(e) = delete_dir_contents(demo_dir, &vec![current_exe, log_file]) {
+        // let demo_dir = read_dir(&update.install_info.path);
+
+        if let Err(e) = delete_dir_contents(&update.install_info.path, &vec![current_exe, log_file])
+        {
             let delete_error = format!(
                 "Unable to cleanup current installation located at {} due to: {}",
-                &install_path.display(),
+                &update.install_info.path.display(),
                 e
             );
             log::error!("{}", delete_error);
             log::warn!("attempting to roll back.");
-            if let Ok(_e) = move_dir(&backup_path, &install_path, &options) {
-                log::warn!("rolled back update process.");
-            } else {
-                log::error!("failed to rollback update process.")
+            if let Err(e) = move_dir(&backup_path, &update.install_info.path, &options) {
+               log::error!("failed to rollback update process. {}", e);
             }
             return Err(BootstrapError::InstallationFailed(delete_error).to_string());
         }
         log::info!("attempting to write updated files.");
-        if let Err(e) = move_dir(&update_staging_path, &install_path, &options) {
+        if let Err(e) = move_dir(&update_staging_path, &update.install_info.path, &options) {
             let update_error_message = format!(
                 "Failed to apply update to {} from {}: {}",
-                &install_path.display(),
+                &update.install_info.path.display(),
                 &update_staging_path.display(),
                 e
             );
             log::error!("{}", update_error_message);
-            if let Ok(_e) = move_dir(&backup_path, &install_path, &options) {
+            if let Ok(_e) = move_dir(&backup_path, &update.install_info.path, &options) {
                 log::warn!("rolled back update.");
             } else {
                 log::error!("failed to rollback update.")
@@ -719,6 +769,8 @@ pub mod updater {
             return Err(BootstrapError::InstallationFailed(update_error_message).to_string());
         }
         log::info!("update went off without a hitch.");
+
+        update.update_display_version();
         Ok("Rainway updated!".to_string())
 
         //dir_contains_all_files(package_files, &install_path);
@@ -727,11 +779,11 @@ pub mod updater {
     /// Runs the full installer and waits for it to exit.
     /// The bootstrapper will not launch Rainway after this.
     /// The installer should be configured to launch post-install.
-    pub fn install(installer_name: String) -> Result<String, String> {
+    pub fn install(update: ActiveUpdate) -> Result<String, String> {
         use std::os::windows::process::CommandExt;
         use std::process::Command;
         let mut download_path = temp_dir();
-        download_path.push(installer_name);
+        download_path.push(update.get_temp_name());
         log::info!("running {}", &download_path.display());
         let results = Command::new(download_path)
             .args(&[""])
@@ -750,35 +802,6 @@ pub mod updater {
         }
         results
     }
-
-    pub fn get_install_info() -> Result<InstallInfo, BootstrapError> {
-        let uninstallers = get_uninstallers()?;
-        let uninstaller = match uninstallers
-            .into_iter()
-            .find(|u| u.name == env!("UNINSTALL_KEY"))
-        {
-            Some(u) => u,
-            None => return Err(BootstrapError::UninstallEntryMissing),
-        };
-        if uninstaller.version.is_empty() {
-            return Err(BootstrapError::LocalVersionMissing);
-        }
-        if uninstaller.install_location.is_empty() {
-            return Err(BootstrapError::InstallPathMissing);
-        }
-        let path = PathBuf::from(&uninstaller.install_location);
-        if !path.is_dir() || !path.exists() {
-            return Err(BootstrapError::InstallPathMissing);
-        }
-        Ok(InstallInfo {
-            version: uninstaller.version,
-            branch: ReleaseBranch::from(uninstaller.branch),
-            name: uninstaller.name,
-            path,
-        })
-    }
-
-    pub fn update_installed_version(version: String) {}
 
     /// Derives if Rainway is currently installed based on
     /// the list of installed applications for the current user.

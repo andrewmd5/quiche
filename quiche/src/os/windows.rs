@@ -1,7 +1,10 @@
 use crate::etc::constants::BootstrapError;
 use regex::Regex;
+use winreg::enums::KEY_ALL_ACCESS;
+use winreg::types::ToRegValue;
+use winreg::HKEY;
 
-use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+use winreg::enums::HKEY_LOCAL_MACHINE;
 use winreg::RegKey;
 
 /// dism.exe will return exit code 740 if it is launched
@@ -22,6 +25,22 @@ pub struct SystemInfo {
     pub is_x64: bool,
 }
 
+/// Windows use the opaque handle scheme that most operating systems use.
+/// When requesting resources from the operating system, you are given a "handle" or cookie that represents the real object.
+/// By supplying one of these handles to the registry we can scoped data.
+#[derive(Debug, Clone, Copy)]
+#[allow(overflowing_literals)]
+pub enum RegistryHandle {
+    CurrentUser = 0x80000001i32 as isize,
+    LocalMachine = 0x80000002i32 as isize,
+}
+
+impl Default for RegistryHandle {
+    fn default() -> Self {
+        RegistryHandle::CurrentUser
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 //An installed app is represented here.
 pub struct InstalledApp {
@@ -30,6 +49,8 @@ pub struct InstalledApp {
     pub name: String,
     pub version: String,
     pub branch: String,
+    pub handle: RegistryHandle,
+    pub key: String,
 }
 
 #[derive(Clone, Default)]
@@ -138,18 +159,40 @@ pub fn needs_media_pack() -> Result<bool, BootstrapError> {
     Ok(true)
 }
 
+pub fn set_uninstall_value<T: ToRegValue>(
+    name: &str,
+    value: &T,
+    sub_key: &String,
+    handle: RegistryHandle,
+) -> Result<(), BootstrapError> {
+    let u_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+    let hkey = RegKey::predef(handle as isize as HKEY);
+    let uninstall_key = match hkey.open_subkey(u_key) {
+        Ok(u) => u,
+        Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(u_key.to_string())),
+    };
+
+    let install_key = match uninstall_key.open_subkey_with_flags(&sub_key, KEY_ALL_ACCESS) {
+        Ok(k) => k,
+        Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(sub_key.to_string())),
+    };
+    if let Err(e) = install_key.set_value(name, value) {
+        return Err(BootstrapError::RegistryValueNotFound(e.to_string()));
+    }
+    Ok(())
+}
+
 /// Returns a list of all the installed software for the current user and local machine
 pub fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
-    let mut uninstallers = get_uninstallers_from_key(RegKey::predef(HKEY_CURRENT_USER))?;
-    uninstallers.extend(get_uninstallers_from_key(RegKey::predef(
-        HKEY_LOCAL_MACHINE,
-    ))?);
+    let mut uninstallers = get_uninstallers_from_key(RegistryHandle::CurrentUser)?;
+    uninstallers.extend(get_uninstallers_from_key(RegistryHandle::LocalMachine)?);
     Ok(uninstallers)
 }
 
 /// Returns a list of uninstallers for a given registry key
-fn get_uninstallers_from_key(hkey: RegKey) -> Result<Vec<InstalledApp>, BootstrapError> {
+fn get_uninstallers_from_key(handle: RegistryHandle) -> Result<Vec<InstalledApp>, BootstrapError> {
     let u_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+    let hkey = RegKey::predef(handle as isize as HKEY);
     let uninstall_key = match hkey.open_subkey(u_key) {
         Ok(u) => u,
         Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(u_key.to_string())),
@@ -160,7 +203,7 @@ fn get_uninstallers_from_key(hkey: RegKey) -> Result<Vec<InstalledApp>, Bootstra
         .map(|x| x.unwrap())
         .filter(|x| !x.trim().is_empty())
     {
-        if let Ok(install_key) = uninstall_key.open_subkey(key) {
+        if let Ok(install_key) = uninstall_key.open_subkey(&key) {
             let mut app = InstalledApp::default();
 
             app.name = install_key.get_value("DisplayName").unwrap_or_default();
@@ -168,6 +211,8 @@ fn get_uninstallers_from_key(hkey: RegKey) -> Result<Vec<InstalledApp>, Bootstra
             app.uninstall_string = install_key.get_value("UninstallString").unwrap_or_default();
             app.version = install_key.get_value("DisplayVersion").unwrap_or_default();
             app.branch = install_key.get_value("QuicheBranch").unwrap_or_default();
+            app.handle = handle.clone();
+            app.key = key;
 
             if !app.name.is_empty()
                 && !app.install_location.is_empty()

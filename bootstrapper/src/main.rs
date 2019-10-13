@@ -6,18 +6,17 @@ mod ui;
 
 use quiche::etc::constants::{is_compiled_for_64_bit, BootstrapError};
 use rainway::{
-    check_system_compatibility, error_on_duplicate_session, kill_rainway_processes, launch_rainway,
+    check_system_compatibility, error_on_duplicate_session, kill_rainway, launch_rainway,
 };
 
 use quiche::io::ico::IconDir;
-use quiche::updater::{get_install_info, is_installed, ActiveUpdate, UpdateType};
+use quiche::updater::{is_installed, ActiveUpdate, UpdateType};
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
 use ui::window::set_dpi_aware;
 
 use rust_embed::RustEmbed;
 use web_view::{Content, Icon, WVResult, WebView};
-
 #[derive(RustEmbed)]
 #[folder = "resources/"]
 struct Asset;
@@ -60,7 +59,7 @@ fn run() -> Result<(), BootstrapError> {
         return Err(e);
     }
 
-    kill_rainway_processes();
+    kill_rainway();
 
     let mut update = ActiveUpdate::default();
     let rainway_installed = is_installed()?;
@@ -68,13 +67,10 @@ fn run() -> Result<(), BootstrapError> {
     if !rainway_installed {
         update.update_type = UpdateType::Install;
     } else {
-        update.install_info = match get_install_info() {
-            Ok(i) => i,
-            Err(e) => {
-                launch_rainway();
-                return Err(e);
-            }
-        };
+        if let Err(e) = update.get_install_info() {
+            launch_rainway();
+            return Err(e);
+        }
         update.update_type = UpdateType::Patch;
     }
 

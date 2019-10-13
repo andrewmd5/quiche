@@ -7,11 +7,10 @@ use web_view::WebView;
 pub fn verify_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
     let verification_complete = "verificationComplete";
     let error_callback = "verificationFailed";
-    let hash = update.get_hash();
-    let temp_file = update.get_temp_name();
+    let ud = update.clone();
     run_async(
         webview,
-        move || verify(hash, temp_file),
+        move || verify(ud),
         verification_complete.to_string(),
         error_callback.to_string(),
     );
@@ -25,15 +24,12 @@ pub fn launch_and_close<T: 'static>(webview: &mut WebView<'_, T>) {
 pub fn apply_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
     let update_complete = "updateComplete";
     let error_callback = "updateFailed";
-    let temp_file = update.get_temp_name();
-    let version = update.get_version();
-    let install_path = update.install_info.path.clone();
-    let update_type = update.update_type.clone();
+    let ud = update.clone();
     run_async(
         webview,
-        move || match update_type {
-            UpdateType::Install => install(temp_file),
-            _ => apply(install_path, temp_file, version),
+        move || match ud.update_type {
+            UpdateType::Install => install(ud),
+            UpdateType::Patch => apply(ud),
         },
         update_complete.to_string(),
         error_callback.to_string(),
@@ -41,15 +37,14 @@ pub fn apply_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpd
 }
 
 pub fn download_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
-    let url = update.get_url();
-    let version = update.get_version();
-    let temp_file = update.get_temp_name();
     let download_complete = "downloadComplete";
     let error_callback = "downloadFailed";
     let handle = webview.handle();
+    let ud = update.clone();
     run_async(
         webview,
         move || {
+            let version = ud.get_version();
             let download_progress = move |total_bytes: u64, downloaded_bytes: u64| {
                 let data = format!(
                     "downloadProgress('{}', '{}', '{}')",
@@ -59,7 +54,7 @@ pub fn download_update<T: 'static>(webview: &mut WebView<'_, T>, update: &Active
                     .dispatch(move |webview| webview.eval(&data.to_string()))
                     .unwrap();
             };
-            download_with_callback(url, temp_file, download_progress)
+            download_with_callback(ud, download_progress)
         },
         download_complete.to_string(),
         error_callback.to_string(),
