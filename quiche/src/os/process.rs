@@ -21,18 +21,17 @@ pub struct Process {
 }
 
 impl Process {
-    /// Get Process ID.
+    /// Get the underlying process id
     pub fn id(&self) -> u32 {
         return self.id;
     }
 
-    /// Get Parent Process ID.
+    /// Gets the immediate parent process id
     pub fn parent(&self) -> u32 {
         return self.parent;
     }
 
-    /// Get Process Name.
-    /// This value maybe program name.
+    /// Gets the process name.
     pub fn name(&self) -> &str {
         return self.name.as_str();
     }
@@ -67,7 +66,7 @@ impl Process {
         }
     }
 
-    /// Get full file path of program if provided.
+    /// Gets the full file path of program if provided.
     pub fn path(&self) -> Option<PathBuf> {
         if let Some(path) = self.path.as_ref() {
             return Some(path.to_path_buf());
@@ -76,7 +75,7 @@ impl Process {
         }
     }
 }
-/// returns a list of processes running on the system. 
+/// Returns a list of processes running on the system. 
 /// will return `None` if there was an issue generating a snapshot from the Windows API
 pub fn get_processes() -> Option<Vec<Process>> {
     let mut tasks: Vec<Process> = Vec::new();
