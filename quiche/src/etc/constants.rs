@@ -1,3 +1,4 @@
+use crate::io::ico::IcoError;
 use crate::updater::{ReleaseBranch, UpdateState, UpdateType};
 use std::fmt;
 
@@ -30,6 +31,8 @@ pub enum BootstrapError {
     RequestError(reqwest::Error),
     IOError(std::io::Error),
     WebView(String),
+    ResourceLoadError(String),
+    IcoError(String),
 }
 
 #[allow(non_snake_case)]
@@ -63,6 +66,8 @@ impl fmt::Display for BootstrapError {
             BootstrapError::LocalVersionMissing => write!(f, "Unable to locate the version of the currently intalled branch."),
             BootstrapError::InstallPathMissing => write!(f, "Unable to locate the installation path of the currently intalled branch."),
             BootstrapError::ReleaseLookupFailed(ref e) => write!(f, "Looks like something went wrong. We were unable to determine the latest Rainway release. Please exit and try again. \n\n {0}", e),
+            BootstrapError::ResourceLoadError(ref e) => write!(f, "Failed to load application resource. {0}", e),
+            BootstrapError::IcoError(ref e) => write!(f, "{0}", e),
         }
     }
 }
@@ -99,6 +104,18 @@ impl From<reqwest::Error> for BootstrapError {
 impl From<std::io::Error> for BootstrapError {
     fn from(error: std::io::Error) -> Self {
         BootstrapError::IOError(error)
+    }
+}
+
+impl From<IcoError> for BootstrapError {
+    fn from(error: IcoError) -> Self {
+        BootstrapError::IcoError(error.to_string())
+    }
+}
+
+impl From<std::str::Utf8Error> for BootstrapError {
+    fn from(_error: std::str::Utf8Error) -> Self {
+        BootstrapError::WebView("Unable to parse UTF8 source.".to_string())
     }
 }
 

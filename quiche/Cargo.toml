@@ -6,7 +6,7 @@ edition = "2018"
 build = "build.rs"
 
 [quiche]
-base_release_url = "http://local.vg:8080"
+base_release_url = "https://releases.rainway.com/quiche"
 release_path = "/Releases.toml"
 
 [dependencies]
