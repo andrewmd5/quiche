@@ -1,14 +1,15 @@
 use std::mem;
 use std::path::PathBuf;
-use winapi::shared::winerror::ERROR_NO_MORE_FILES;
+use winapi::shared::winerror::{ERROR_NO_MORE_FILES};
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
-use winapi::um::processthreadsapi::{OpenProcess, TerminateProcess};
+use winapi::um::processthreadsapi::{OpenProcess, TerminateProcess, GetExitCodeProcess};
 use winapi::um::tlhelp32::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
 };
 use winapi::um::winbase::QueryFullProcessImageNameW;
-use winapi::um::winnt::PROCESS_TERMINATE;
+use winapi::um::winnt::{PROCESS_TERMINATE, PROCESS_QUERY_INFORMATION};
+use winapi::um::minwinbase::STILL_ACTIVE;
 
 /// Basic Process Object.
 #[derive(Debug)]
@@ -36,6 +37,7 @@ impl Process {
         return self.name.as_str();
     }
 
+    /// Kills the underlying process with prodigious. 
     pub fn kill(&self) -> bool {
         unsafe {
             let handle = OpenProcess(PROCESS_TERMINATE, 0, self.id);
@@ -46,7 +48,26 @@ impl Process {
         }
     }
 
-    /// Get Full file path of program if provided.
+    /// Determines if the underlying process is still running by using GetExitCodeProcess. 
+    /// It will return STILL_ACTIVE (259) if the process is still running. 
+    /// Microsoft says people should NOT use 259 as an exit code, so this should be fine.
+    pub fn is_running(&self) -> bool {
+        unsafe {
+            let handle = OpenProcess(PROCESS_QUERY_INFORMATION, 0, self.id);
+            if handle == INVALID_HANDLE_VALUE {
+                return false;
+            }
+            let mut exit_code = 0;
+            let ret = GetExitCodeProcess(handle, &mut exit_code);
+            if ret == 0 {
+                return false;
+            }
+            CloseHandle(handle);
+            return exit_code == STILL_ACTIVE;
+        }
+    }
+
+    /// Get full file path of program if provided.
     pub fn path(&self) -> Option<PathBuf> {
         if let Some(path) = self.path.as_ref() {
             return Some(path.to_path_buf());
@@ -55,7 +76,8 @@ impl Process {
         }
     }
 }
-
+/// returns a list of processes running on the system. 
+/// will return `None` if there was an issue generating a snapshot from the Windows API
 pub fn get_processes() -> Option<Vec<Process>> {
     let mut tasks: Vec<Process> = Vec::new();
 
@@ -71,7 +93,7 @@ pub fn get_processes() -> Option<Vec<Process>> {
     }
     Some(tasks)
 }
-
+/// Turns a `PROCESSENTRY32W` structure into a `Process` object. 
 fn process(entry: PROCESSENTRY32W) -> Process {
     let mut ps = Process {
         id: entry.th32ProcessID,
@@ -82,19 +104,17 @@ fn process(entry: PROCESSENTRY32W) -> Process {
         path: None,
     };
 
-    // Resolve Full Path.
+    // Resolve the actual app name/path
     unsafe {
-        // 0x00000400 = PROCESS_QUERY_INFORMATION
-        let handle = OpenProcess(0x00000400, 0, entry.th32ProcessID);
+        let handle = OpenProcess(PROCESS_QUERY_INFORMATION, 0, entry.th32ProcessID);
         if handle != INVALID_HANDLE_VALUE {
             let mut name: [u16; 260] = [0; 260];
             let mut size = 260;
             let result = QueryFullProcessImageNameW(handle, 0, &mut name[0], &mut size);
 
-            // Close Process Handle.
+            // Close process Handle.
             CloseHandle(handle);
-
-            // Check Result.
+            // win api functions return zero if they failed.
             if result != 0 {
                 let full = PathBuf::from(
                     String::from_utf16_lossy(&name)
@@ -118,6 +138,11 @@ fn process(entry: PROCESSENTRY32W) -> Process {
     return ps;
 }
 
+/// Queries for a list of active processes on the system. 
+/// Everyone seems to have forgotten that 32-bit processes cannot access 64-bit process modules.
+/// So every "solution" for getting system proceses in most languages is literally a case of "works on my machine."
+/// In their defense, 32-bit shouldn't be your default target anymore, but in our case we need the process name of 64-bit apps.
+/// To achieve this I wrote my own snapshot implementation which avoids module access. 
 fn snapshot() -> Result<Vec<PROCESSENTRY32W>, u32> {
     let mut processes: Vec<PROCESSENTRY32W> = Vec::new();
     unsafe {
@@ -127,6 +152,7 @@ fn snapshot() -> Result<Vec<PROCESSENTRY32W>, u32> {
         }
 
         let mut entry: PROCESSENTRY32W = mem::uninitialized();
+        // We must set the size first or this will not work.
         entry.dwSize = mem::size_of_val(&entry) as _;
 
         // Get First Process.
@@ -143,7 +169,7 @@ fn snapshot() -> Result<Vec<PROCESSENTRY32W>, u32> {
             processes.push(entry.clone());
         }
 
-        // Load Processes.
+        // Now loop over all the others.
         loop {
             result = Process32NextW(snapshot, &mut entry);
             if result == 0 {
