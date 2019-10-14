@@ -11,8 +11,7 @@ pub struct Guid {
 }
 
 impl Guid {
-
-    /// Returns a `CLSID` which is a globally unique identifier 
+    /// Returns a `CLSID` which is a globally unique identifier
     /// that identifies a COM class object.
     /// Also known as GUID/UUID to others.
     pub fn clsid(&self) -> GUID {
@@ -20,7 +19,7 @@ impl Guid {
     }
 
     /// Creates a new `Guid` structure which has a backing `CLSID`.A
-    /// The Guid is UUID v4 compatible. 
+    /// The Guid is UUID v4 compatible.
     pub fn new() -> Option<Guid> {
         if let Some(clsid) = generate_guid() {
             return Some(Guid { clsid });
@@ -29,8 +28,8 @@ impl Guid {
     }
 
     /// Returns a string representation of the value of this instance of the Guid structure.
-    /// The following table shows the accepted format specifiers for the format parameter. 
-    /// 
+    /// The following table shows the accepted format specifiers for the format parameter.
+    ///
     /// | Specifier |                 Format of return value |
     /// |-----------|---------------------------------------:|
     /// |    `N`    |      `00000000000000000000000000000000`|
@@ -94,7 +93,7 @@ impl Guid {
             format!("{{{}}}", b)
         } else {
             guid_str.to_string()
-        };        
+        };
         log::info!("what {}", formatted);
         let s: Vec<_> = formatted.encode_utf16().chain(Some(0)).collect();
         unsafe {
@@ -121,11 +120,10 @@ fn generate_guid() -> Option<GUID> {
     Some(result)
 }
 
-
 #[cfg(test)]
 mod test {
     use super::Guid;
-     #[test]
+    #[test]
     fn with_braces() {
         let clsid = "{FA19F1DF-3226-441A-BA5B-40F6EB8AB6B1}";
         let guid = Guid::from_str(clsid).unwrap().format("B").unwrap();

@@ -4,6 +4,7 @@
 mod rainway;
 mod ui;
 
+use log::Level;
 use quiche::etc::constants::{is_compiled_for_64_bit, BootstrapError};
 use rainway::{
     check_system_compatibility, error_on_duplicate_session, kill_rainway, launch_rainway,
@@ -54,6 +55,8 @@ fn main() -> Result<(), BootstrapError> {
 }
 
 fn run() -> Result<(), BootstrapError> {
+
+    // TODO self-updating the bootstrapping executable
     if let Err(e) = error_on_duplicate_session() {
         log::error!("found another bootstrapper session. killing session.");
         return Err(e);
@@ -198,10 +201,15 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         "launch" => {
             launch_and_close(webview);
         }
+        "minimize" => {
+            std::process::exit(0);
+        }
         "exit" => {
             std::process::exit(0);
         }
-        "retry" => {}
+        "retry" => {
+            webview.minimize();
+        }
         _ => {
             if arg.contains("log|") {
                 log::debug!("[Javascript] {}", arg.split('|').collect::<Vec<&str>>()[1]);
@@ -239,6 +247,7 @@ fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
     // Separate file config so we can include colors in the terminal
     let file_config = fern::Dispatch::new()
         .format(|out, message, record| {
+            add_breadcrumb(message.to_string(), record.level());
             out.finish(format_args!(
                 "[{}][{}] {}",
                 record.target(),
@@ -265,4 +274,20 @@ fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
         .apply()?;
 
     Ok(())
+}
+
+fn add_breadcrumb(message: String, level: Level) {
+    let sentry_level = match level {
+        Level::Debug => sentry::Level::Debug,
+        Level::Error => sentry::Level::Error,
+        Level::Info => sentry::Level::Info,
+        Level::Warn => sentry::Level::Warning,
+        Level::Trace => sentry::Level::Debug,
+    };
+    sentry::add_breadcrumb(|| sentry::Breadcrumb {
+        ty: "log".into(),
+        level: sentry_level,
+        message: Some(message.into()),
+        ..Default::default()
+    });
 }

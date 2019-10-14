@@ -40,7 +40,7 @@ pub fn kill_rainway() {
                 || process.name() == "LaunchRainway.exe"
                 || process.name() == "RainwayInstaller.exe"
             {
-                if process.is_running() && process.kill() {
+                if process.kill() {
                     log::info!("Rainway process {} terminated", process.name());
                 }
             }
