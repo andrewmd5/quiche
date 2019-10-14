@@ -4,21 +4,20 @@
 mod rainway;
 mod ui;
 
+use log::Level;
 use quiche::etc::constants::{is_compiled_for_64_bit, BootstrapError};
 use rainway::{
-    check_system_compatibility, error_on_duplicate_session, get_config_branch, get_install_path,
-    get_installed_version, is_installed, kill_rainway_processes, launch_rainway,
+    check_system_compatibility, error_on_duplicate_session, kill_rainway, launch_rainway,
 };
 
 use quiche::io::ico::IconDir;
-use quiche::updater::{ActiveUpdate, UpdateType};
+use quiche::updater::{is_installed, ActiveUpdate, UpdateType};
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
 use ui::window::set_dpi_aware;
 
 use rust_embed::RustEmbed;
 use web_view::{Content, Icon, WVResult, WebView};
-
 #[derive(RustEmbed)]
 #[folder = "resources/"]
 struct Asset;
@@ -37,7 +36,7 @@ fn main() -> Result<(), BootstrapError> {
         panic!("Build against i686-pc-windows-msvc for production releases.")
     }
     let verbosity = if !cfg!(debug_assertions) { 1 } else { 0 };
-    
+
     setup_logging(verbosity).expect("failed to initialize logging.");
 
     if let Err(e) = run() {
@@ -56,34 +55,26 @@ fn main() -> Result<(), BootstrapError> {
 }
 
 fn run() -> Result<(), BootstrapError> {
+
+    // TODO self-updating the bootstrapping executable
     if let Err(e) = error_on_duplicate_session() {
         log::error!("found another bootstrapper session. killing session.");
         return Err(e);
     }
 
-    kill_rainway_processes();
+    kill_rainway();
 
+    let mut update = ActiveUpdate::default();
     let rainway_installed = is_installed()?;
     log::info!("Rainway installed: {}", rainway_installed);
-    let mut update = ActiveUpdate::default();
     if !rainway_installed {
         update.update_type = UpdateType::Install;
     } else {
+        if let Err(e) = update.get_install_info() {
+            launch_rainway();
+            return Err(e);
+        }
         update.update_type = UpdateType::Patch;
-        update.current_version = match get_installed_version() {
-            Some(v) => v,
-            None => {
-                launch_rainway();
-                return Err(BootstrapError::LocalVersionMissing);
-            }
-        };
-        update.install_path = match get_install_path() {
-            Some(p) => p,
-            None => {
-                launch_rainway();
-                return Err(BootstrapError::InstallPathMissing);
-            }
-        };
     }
 
     log::info!("update type: {}", update.update_type);
@@ -94,9 +85,9 @@ fn run() -> Result<(), BootstrapError> {
     }
 
     //regardless of whether we need to update or install, we need the latest branch.
-    let config_branch = get_config_branch();
+    let config_branch = update.install_info.branch;
     log::info!("user branch: {}", config_branch);
-    if let Err(e) = update.get_manifest(&config_branch) {
+    if let Err(e) = update.get_manifest(config_branch) {
         if rainway_installed {
             log::error!("unable to check for latest branch. starting currently installed version.");
             launch_rainway();
@@ -210,10 +201,15 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         "launch" => {
             launch_and_close(webview);
         }
+        "minimize" => {
+            std::process::exit(0);
+        }
         "exit" => {
             std::process::exit(0);
         }
-        "retry" => {}
+        "retry" => {
+            webview.minimize();
+        }
         _ => {
             if arg.contains("log|") {
                 log::debug!("[Javascript] {}", arg.split('|').collect::<Vec<&str>>()[1]);
@@ -251,6 +247,7 @@ fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
     // Separate file config so we can include colors in the terminal
     let file_config = fern::Dispatch::new()
         .format(|out, message, record| {
+            add_breadcrumb(message.to_string(), record.level());
             out.finish(format_args!(
                 "[{}][{}] {}",
                 record.target(),
@@ -277,4 +274,20 @@ fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
         .apply()?;
 
     Ok(())
+}
+
+fn add_breadcrumb(message: String, level: Level) {
+    let sentry_level = match level {
+        Level::Debug => sentry::Level::Debug,
+        Level::Error => sentry::Level::Error,
+        Level::Info => sentry::Level::Info,
+        Level::Warn => sentry::Level::Warning,
+        Level::Trace => sentry::Level::Debug,
+    };
+    sentry::add_breadcrumb(|| sentry::Breadcrumb {
+        ty: "log".into(),
+        level: sentry_level,
+        message: Some(message.into()),
+        ..Default::default()
+    });
 }

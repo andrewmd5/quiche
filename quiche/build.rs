@@ -29,6 +29,10 @@ fn main() {
         find_cargo_field("base_release_url")
     );
     println!(
+        "cargo:rustc-env=UNINSTALL_KEY={}",
+        find_cargo_field("uninstall_key")
+    );
+    println!(
         "cargo:rustc-env=RELEASE_PATH={}",
         find_cargo_field("release_path")
     );

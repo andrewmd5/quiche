@@ -24,16 +24,15 @@ pub fn show_error_with_url(caption: &'static str, text: String, url: &'static st
 /// opens a URL in the systems default web browser.
 pub fn open_url(url: &'static str) {
     use std::ptr;
-    use widestring::U16CString;
     use winapi::shared::winerror::SUCCEEDED;
     use winapi::um::combaseapi::{CoInitializeEx, CoUninitialize};
     use winapi::um::objbase::{COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE};
     use winapi::um::shellapi::ShellExecuteW;
     use winapi::um::winuser::SW_SHOWNORMAL;
 
-    let open = U16CString::from_str("open").unwrap();
+    let open: Vec<_> = "open".encode_utf16().chain(Some(0)).collect();
+    let url: Vec<_> = url.encode_utf16().chain(Some(0)).collect();
 
-    let url = U16CString::from_str(url).unwrap();
     unsafe {
         let coinitializeex_result = CoInitializeEx(
             ptr::null_mut(),

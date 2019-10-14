@@ -17,7 +17,7 @@ pub enum BootstrapError {
     NeedWindowsMediaPack(String),
     RegistryKeyNotFound(String),
     RegistryValueNotFound(String),
-    HttpFailed(u16, String),
+    HttpFailed(String),
     LocalVersionMissing,
     InstallPathMissing,
     ReleaseLookupFailed(String),
@@ -33,6 +33,7 @@ pub enum BootstrapError {
     WebView(String),
     ResourceLoadError(String),
     IcoError(String),
+    UninstallEntryMissing,
 }
 
 #[allow(non_snake_case)]
@@ -52,7 +53,7 @@ impl fmt::Display for BootstrapError {
             BootstrapError::NeedWindowsMediaPack(ref s) => write!(f, "A required video codec is missing from your system. Please install the Windows Media Pack for {}.\n\nPress \"Ok\" to open the codec download page.", s),
             BootstrapError::RegistryKeyNotFound(ref s) => write!(f, "An error occured accessing Windows Registry key: {}.", s),
             BootstrapError::RegistryValueNotFound(ref s) => write!(f, "An error occured accessing Windows Registry value: {}.", s),
-            BootstrapError::HttpFailed(ref c, ref s) => write!(f, "Network connection issue occured accessing {}: {}.", s, c),
+            BootstrapError::HttpFailed(ref s) => write!(f, "{}", s),
             BootstrapError::VersionCheckFailed(ref rv, ref lv) => write!(f, "Unable to compare remote version ({}) to installed version ({}).", rv, lv),
             BootstrapError::TomlParseFailure(ref s, ref e) => write!(f, "An exception was encountered parsing a remote file located at {} due to {}", s, e),
             BootstrapError::SignatureMismatch => write!(f, "We were unable to validate the updates integrity. Please exit and try again."),
@@ -68,6 +69,7 @@ impl fmt::Display for BootstrapError {
             BootstrapError::ReleaseLookupFailed(ref e) => write!(f, "Looks like something went wrong. We were unable to determine the latest Rainway release. Please exit and try again. \n\n {0}", e),
             BootstrapError::ResourceLoadError(ref e) => write!(f, "Failed to load application resource. {0}", e),
             BootstrapError::IcoError(ref e) => write!(f, "{0}", e),
+            BootstrapError::UninstallEntryMissing => write!(f, "No Uninstall key entry was present for {0}.", env!("UNINSTALL_KEY")),
         }
     }
 }
