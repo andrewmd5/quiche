@@ -4,13 +4,13 @@ use std::mem;
 use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
 use winapi::shared::minwindef::DWORD;
-use winapi::shared::winerror::{ERROR_MORE_DATA, ERROR_NO_MORE_FILES, S_OK};
+use winapi::shared::winerror::{ERROR_MORE_DATA, ERROR_NO_MORE_FILES};
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
 use winapi::um::minwinbase::STILL_ACTIVE;
 use winapi::um::processthreadsapi::{GetExitCodeProcess, OpenProcess, TerminateProcess};
 use winapi::um::restartmanager::{
-    RmEndSession, RmForceShutdown, RmGetList, RmRebootReasonNone, RmRegisterResources, RmShutdown,
+    RmEndSession, RmGetList, RmRebootReasonNone, RmRegisterResources,
     RmStartSession, RM_PROCESS_INFO,
 };
 use winapi::um::tlhelp32::{
