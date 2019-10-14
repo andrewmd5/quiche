@@ -5,53 +5,6 @@ use std::env;
 use std::fs::File;
 use std::path::Path;
 
-fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
-    let colors = ColoredLevelConfig::new()
-        .trace(Color::BrightCyan)
-        .debug(Color::BrightMagenta)
-        .warn(Color::BrightYellow)
-        .info(Color::BrightGreen)
-        .error(Color::BrightRed);
-
-    let mut base_config = fern::Dispatch::new();
-
-    base_config = match verbosity {
-        0 => base_config.level(log::LevelFilter::Debug),
-        1 => base_config.level(log::LevelFilter::Info),
-        2 => base_config.level(log::LevelFilter::Warn),
-        _3_or_more => base_config.level(log::LevelFilter::Error),
-    };
-
-    // Separate file config so we can include colors in the terminal
-    let file_config = fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "[{}][{}] {}",
-                record.target(),
-                record.level(),
-                message
-            ))
-        })
-        .chain(File::create(format!("{}.log", env!("CARGO_PKG_NAME")))?);
-
-    let stdout_config = fern::Dispatch::new()
-        .format(move |out, message, record| {
-            out.finish(format_args!(
-                "[{}][{}] {}",
-                record.target(),
-                colors.color(record.level()),
-                message
-            ))
-        })
-        .chain(std::io::stdout());
-
-    base_config
-        .chain(file_config)
-        .chain(stdout_config)
-        .apply()?;
-
-    Ok(())
-}
 fn main() {
     println!("{}", LOGO);
 
@@ -123,6 +76,55 @@ fn main() {
         panic!("stage failure.");
     }
     log::info!("dinner is served! the release was successfully baked.");
+}
+
+
+fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
+    let colors = ColoredLevelConfig::new()
+        .trace(Color::BrightCyan)
+        .debug(Color::BrightMagenta)
+        .warn(Color::BrightYellow)
+        .info(Color::BrightGreen)
+        .error(Color::BrightRed);
+
+    let mut base_config = fern::Dispatch::new();
+
+    base_config = match verbosity {
+        0 => base_config.level(log::LevelFilter::Debug),
+        1 => base_config.level(log::LevelFilter::Info),
+        2 => base_config.level(log::LevelFilter::Warn),
+        _3_or_more => base_config.level(log::LevelFilter::Error),
+    };
+
+    // Separate file config so we can include colors in the terminal
+    let file_config = fern::Dispatch::new()
+        .format(|out, message, record| {
+            out.finish(format_args!(
+                "[{}][{}] {}",
+                record.target(),
+                record.level(),
+                message
+            ))
+        })
+        .chain(File::create(format!("{}.log", env!("CARGO_PKG_NAME")))?);
+
+    let stdout_config = fern::Dispatch::new()
+        .format(move |out, message, record| {
+            out.finish(format_args!(
+                "[{}][{}] {}",
+                record.target(),
+                colors.color(record.level()),
+                message
+            ))
+        })
+        .chain(std::io::stdout());
+
+    base_config
+        .chain(file_config)
+        .chain(stdout_config)
+        .apply()?;
+
+    Ok(())
 }
 
 const LOGO: &str = r#"
