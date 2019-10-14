@@ -1,4 +1,5 @@
 use crate::os::guid::Guid;
+use std::io::{Error, ErrorKind};
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
@@ -101,8 +102,8 @@ pub fn get_processes() -> Option<Vec<Process>> {
     Some(tasks)
 }
 
-/// returns a list of processes that  have a particular file locked 
-pub fn get_procs_using_path<P: AsRef<Path>>(path: P) -> Result<Vec<Process>, String> {
+/// returns a list of processes that  have a particular file locked
+pub fn get_procs_using_path<P: AsRef<Path>>(path: P) -> Result<Vec<Process>, Error> {
     let mut session_handle: DWORD = 0;
     let key = Guid::new().unwrap().format("N").unwrap();
     let mut s: Vec<_> = key.encode_utf16().chain(Some(0)).collect();
@@ -110,7 +111,7 @@ pub fn get_procs_using_path<P: AsRef<Path>>(path: P) -> Result<Vec<Process>, Str
         let res = RmStartSession(&mut session_handle, 0, s.as_mut_ptr());
         if res != 0 {
             RmEndSession(session_handle);
-            return Err(format!("Failed to start session: {}.", res));
+            return Err(Error::from_raw_os_error(res as i32));
         }
         let wide_path: Vec<_> = path
             .as_ref()
@@ -131,7 +132,7 @@ pub fn get_procs_using_path<P: AsRef<Path>>(path: P) -> Result<Vec<Process>, Str
         ) != 0
         {
             RmEndSession(session_handle);
-            return Err("Could not register resource.".to_string());
+            return Err(Error::from(ErrorKind::ConnectionRefused));
         }
 
         let mut n_proc_info_needed = 0;
@@ -152,7 +153,7 @@ pub fn get_procs_using_path<P: AsRef<Path>>(path: P) -> Result<Vec<Process>, Str
         }
         if res != ERROR_MORE_DATA {
             RmEndSession(session_handle);
-            return Err(format!("Unexpected error {:?}", res));
+            return Err(Error::from_raw_os_error(res as i32));
         }
         // Fetch the processes.
         let mut process_info: Vec<RM_PROCESS_INFO> =
@@ -167,7 +168,7 @@ pub fn get_procs_using_path<P: AsRef<Path>>(path: P) -> Result<Vec<Process>, Str
         ) != 0
         {
             RmEndSession(session_handle);
-            return Err("Failed to fetch list.".to_string());
+            return Err(Error::from(ErrorKind::NotFound));
         }
 
         process_info.set_len(n_proc_info as usize);

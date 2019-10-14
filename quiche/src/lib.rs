@@ -6,14 +6,13 @@ pub mod os;
 pub mod bakery {
 
     use crate::etc::constants::BootstrapError;
-    use crate::io::disk::{delete_dir_contents, get_dir_files, to_slash};
+    use crate::io::disk::{delete_dir_contents, get_dir_files, to_slash, copy_file};
     use crate::io::hash::sha_256;
     use crate::io::zip::zip_with_progress;
     use crate::updater::{
         get_base_release_url, get_releases, Branch, Installer, Manifest, Package, ReleaseBranch,
         Releases,
     };
-    use fs_extra::file::{copy, CopyOptions};
     use serde::Deserialize;
     use std::io::{Error, ErrorKind};
     use std::{
@@ -247,13 +246,10 @@ pub mod bakery {
             write(&manifest_path, &manifest_encoded)?;
             log::info!("wrote release manifest to {}", &manifest_path.display());
 
-            let mut options = CopyOptions::new();
-            options.overwrite = true;
-
             let mut copied_installer_path = self.output_dir.clone();
             copied_installer_path.push("installer.exe");
 
-            if let Err(e) = copy(&self.installer_path, &copied_installer_path, &options) {
+            if let Err(e) = copy_file(&self.installer_path, &copied_installer_path) {
                 return Err(BootstrapError::RecipeStageFailure(e.to_string()));
             }
             log::info!(
@@ -287,16 +283,17 @@ pub mod bakery {
 
 pub mod updater {
 
-    use std::fs::remove_dir_all;
-use crate::etc::constants::BootstrapError;
+    use crate::etc::constants::BootstrapError;
     use crate::io::disk::to_slash;
-    use crate::io::disk::{delete_dir_contents, dir_contains_all_files, get_filename};
+    use crate::io::disk::{
+        copy_dir, delete_dir_contents, dir_contains_all_files, get_filename, move_dir,
+    };
     use crate::io::hash::sha_256;
     use crate::io::zip::unzip;
     use crate::net::http::{download_file, download_toml};
     use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle};
-    use fs_extra::dir::{copy, move_dir, CopyOptions};
     use serde::{Deserialize, Serialize};
+    use std::fs::remove_dir_all;
 
     use std::{
         env::{temp_dir, var},
@@ -658,6 +655,20 @@ use crate::etc::constants::BootstrapError;
         let mut update_staging_path = temp_dir();
         update_staging_path.push(format!("Rainway_Stage_{}", &update.get_version()));
 
+        let current_exe = match std::env::current_exe() {
+            Ok(exe) => get_filename(&exe),
+            Err(e) => {
+                return Err(BootstrapError::InstallationFailed(format!(
+                    "Unable to locate current exe: {}",
+                    e
+                ))
+                .to_string())
+            }
+        };
+        log::info!("current_exe == {}", &current_exe);
+        let log_file = format!("{}", current_exe.replace(".exe", ".log"));
+        let ignored_files = vec![current_exe, log_file];
+
         log::debug!("update_staging_path == {}", &update_staging_path.display());
 
         if update_staging_path.exists() {
@@ -689,13 +700,9 @@ use crate::etc::constants::BootstrapError;
                 return Err(BootstrapError::InstallationFailed(backup_clean_error).to_string());
             }
         }
-        let mut options = CopyOptions::new();
-        options.copy_inside = true;
-        options.content_only = true;
-        options.overwrite = true;
         //make the backup
         log::info!("attempting to create a backup of the current installation.");
-        if let Err(e) = copy(&update.install_info.path, &backup_path, &options) {
+        if let Err(e) = copy_dir(&update.install_info.path, &backup_path, &ignored_files) {
             let backup_error = format!(
                 "Unable to backup installation to {}: {}",
                 backup_path.display(),
@@ -717,19 +724,6 @@ use crate::etc::constants::BootstrapError;
             return Err(BootstrapError::InstallationFailed(unzip_error).to_string());
         }
         log::info!("update extracted to {}", &update_staging_path.display());
-        let current_exe = match std::env::current_exe() {
-            Ok(exe) => get_filename(&exe),
-            Err(e) => {
-                return Err(BootstrapError::InstallationFailed(format!(
-                    "Unable to locate current exe: {}",
-                    e
-                ))
-                .to_string())
-            }
-        };
-
-        log::debug!("current_exe == {}", &current_exe);
-        let log_file = format!("{}.log", env!("CARGO_PKG_NAME"));
 
         //delete the install without deleting the root folder.
         log::info!(
@@ -738,8 +732,7 @@ use crate::etc::constants::BootstrapError;
         );
         // let demo_dir = read_dir(&update.install_info.path);
 
-        if let Err(e) = delete_dir_contents(&update.install_info.path, &vec![current_exe, log_file])
-        {
+        if let Err(e) = delete_dir_contents(&update.install_info.path, &ignored_files) {
             let delete_error = format!(
                 "Unable to cleanup current installation located at {} due to: {}",
                 &update.install_info.path.display(),
@@ -747,13 +740,17 @@ use crate::etc::constants::BootstrapError;
             );
             log::error!("{}", delete_error);
             log::warn!("attempting to roll back.");
-            if let Err(e) = move_dir(&backup_path, &update.install_info.path, &options) {
-               log::error!("failed to rollback update process. {}", e);
+            if let Err(e) = move_dir(&backup_path, &update.install_info.path, &ignored_files) {
+                log::error!("failed to rollback update process. {}", e);
             }
             return Err(BootstrapError::InstallationFailed(delete_error).to_string());
         }
         log::info!("attempting to write updated files.");
-        if let Err(e) = move_dir(&update_staging_path, &update.install_info.path, &options) {
+        if let Err(e) = move_dir(
+            &update_staging_path,
+            &update.install_info.path,
+            &ignored_files,
+        ) {
             let update_error_message = format!(
                 "Failed to apply update to {} from {}: {}",
                 &update.install_info.path.display(),
@@ -761,7 +758,7 @@ use crate::etc::constants::BootstrapError;
                 e
             );
             log::error!("{}", update_error_message);
-            if let Ok(_e) = move_dir(&backup_path, &update.install_info.path, &options) {
+            if let Ok(_e) = move_dir(&backup_path, &update.install_info.path, &ignored_files) {
                 log::warn!("rolled back update.");
             } else {
                 log::error!("failed to rollback update.")
