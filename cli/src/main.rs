@@ -78,7 +78,6 @@ fn main() {
     log::info!("dinner is served! the release was successfully baked.");
 }
 
-
 fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
     let colors = ColoredLevelConfig::new()
         .trace(Color::BrightCyan)

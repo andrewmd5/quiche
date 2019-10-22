@@ -10,8 +10,8 @@ use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
 use winapi::um::minwinbase::STILL_ACTIVE;
 use winapi::um::processthreadsapi::{GetExitCodeProcess, OpenProcess, TerminateProcess};
 use winapi::um::restartmanager::{
-    RmEndSession, RmGetList, RmRebootReasonNone, RmRegisterResources,
-    RmStartSession, RM_PROCESS_INFO,
+    RmEndSession, RmGetList, RmRebootReasonNone, RmRegisterResources, RmStartSession,
+    RM_PROCESS_INFO,
 };
 use winapi::um::tlhelp32::{
     CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,

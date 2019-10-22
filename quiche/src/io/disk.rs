@@ -97,12 +97,12 @@ pub fn to_slash(buf: &Path) -> PathBuf {
 /// Allows you to supply a vector of files you'd like to exclude for deletion
 pub fn delete_dir_contents(path: &Path, ignored: &Vec<String>) -> Result<(), Error> {
     for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
-        if entry.path().exists() && !entry.path().is_dir() {
+        if entry.path().exists() && entry.path().is_file() {
             if (&ignored)
                 .into_iter()
                 .any(|v| v.clone() == get_filename(&entry.path()))
             {
-               continue;
+                continue;
             }
             fs::remove_file(entry.path())?;
         }
@@ -135,13 +135,16 @@ pub fn copy_file(from: &Path, to: &Path) -> Result<(), Error> {
 /// attempts to move or copy a file to a destination path.
 /// this will return an error if the file is locked, or otherwise not available.
 fn link_file(from: &Path, to: &Path, copy_file: bool) -> Result<(), Error> {
-    if from.is_dir() {
-        log::error!("The source file path is not a executable {}", &from.display());
-        return Err(Error::from(ErrorKind::InvalidInput));
-    }
     if !from.exists() {
         log::error!("The source file path does not exist {}", &from.display());
         return Err(Error::from(ErrorKind::NotFound));
+    }
+    if !from.is_file() {
+        log::error!(
+            "The source file path is not a executable {}",
+            &from.display()
+        );
+        return Err(Error::from(ErrorKind::InvalidInput));
     }
     if to.exists() {
         remove_file(&to)?;
@@ -194,13 +197,13 @@ fn move_dir_contents(
     ignored: &Vec<String>,
     copy_contents: bool,
 ) -> Result<(), Error> {
-    if !from.is_dir() {
-        log::error!("The source dir path is not a directory {}", &from.display());
-        return Err(Error::from(ErrorKind::InvalidInput));
-    }
     if !from.exists() {
         log::error!("The source dir path does not exist {}", &from.display());
         return Err(Error::from(ErrorKind::NotFound));
+    }
+    if !from.is_dir() {
+        log::error!("The source dir path is not a directory {}", &from.display());
+        return Err(Error::from(ErrorKind::InvalidInput));
     }
     if !to.exists() {
         create_dir_all(&to)?;
@@ -224,7 +227,7 @@ fn move_dir_contents(
     // now we complete the file tree
     for entry in WalkDir::new(&from).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
-        if path.exists() && !path.is_dir() {
+        if path.exists() && path.is_file() {
             if (&ignored)
                 .into_iter()
                 .any(|v| v.clone() == get_filename(&path))
@@ -251,4 +254,39 @@ fn move_dir_contents(
         log::info!("deleted the remaining contents of {}", &from.display());
     }
     Ok(())
+}
+
+pub fn swap_files(from: &Path, to: &Path) -> Result<(), Error> {
+    if !from.exists() {
+        log::error!("The source file does not exist {}", &from.display());
+        return Err(Error::from(ErrorKind::NotFound));
+    }
+    if !from.is_file() {
+        log::error!("The source path is not a file {}", &from.display());
+        return Err(Error::from(ErrorKind::InvalidInput));
+    }
+    if !to.exists() {
+        log::error!("The output file does not exist {}", &from.display());
+        return Err(Error::from(ErrorKind::NotFound));
+    }
+    if !to.is_file() {
+        log::error!("The output path is not a file {}", &from.display());
+        return Err(Error::from(ErrorKind::InvalidInput));
+    }
+    if let Some(parent) = from.parent() {
+        let current_file = get_filename(&from);
+        let old_file = PathBuf::from(format!("{}\\{}_old", parent.display(), current_file));
+        rename(&from, &old_file)?;
+        match rename(&to, &from) {
+            Err(_e) => rename(&old_file, &from)?,
+            Ok(f) => f,
+        }
+        Ok(())
+    } else {
+        log::error!(
+            "Cannot locate parent directory of {} for file swap",
+            &from.display()
+        );
+        return Err(Error::from(ErrorKind::InvalidInput));
+    }
 }

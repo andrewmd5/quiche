@@ -55,8 +55,6 @@ fn main() -> Result<(), BootstrapError> {
 }
 
 fn run() -> Result<(), BootstrapError> {
-
-    // TODO self-updating the bootstrapping executable
     if let Err(e) = error_on_duplicate_session() {
         log::error!("found another bootstrapper session. killing session.");
         return Err(e);
@@ -73,6 +71,9 @@ fn run() -> Result<(), BootstrapError> {
         if let Err(e) = update.get_install_info() {
             launch_rainway();
             return Err(e);
+        }
+        if let Err(e) = update.try_self_care() {
+            log::error!("could not self-update the bootstrapper. {}", e);
         }
         update.update_type = UpdateType::Patch;
     }
@@ -202,13 +203,10 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
             launch_and_close(webview);
         }
         "minimize" => {
-            std::process::exit(0);
+            webview.minimize();
         }
         "exit" => {
             std::process::exit(0);
-        }
-        "retry" => {
-            webview.minimize();
         }
         _ => {
             if arg.contains("log|") {
