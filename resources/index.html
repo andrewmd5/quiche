@@ -473,10 +473,7 @@
             console.log(e)
             setCurrentStep.call(this, slugs.finished)
             progressDescriptionText.innerHTML = 'Dashboard v' + downloadVersion + ' installed!';
-            setTimeout(
-                function () {
-                    external[slugs.invoke]('exit')
-                }, 2500);
+            external[slugs.invoke]('launch')
         }
 
         function updateFailed(e) {

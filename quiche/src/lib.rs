@@ -6,7 +6,7 @@ pub mod os;
 pub mod bakery {
 
     use crate::etc::constants::BootstrapError;
-    use crate::io::disk::{delete_dir_contents, get_dir_files, to_slash, copy_file};
+    use crate::io::disk::{copy_file, delete_dir_contents, get_dir_files, to_slash};
     use crate::io::hash::sha_256;
     use crate::io::zip::zip_with_progress;
     use crate::updater::{
@@ -286,7 +286,7 @@ pub mod updater {
     use crate::etc::constants::BootstrapError;
     use crate::io::disk::to_slash;
     use crate::io::disk::{
-        copy_dir, delete_dir_contents, dir_contains_all_files, get_filename, move_dir,
+        copy_dir, delete_dir_contents, dir_contains_all_files, get_filename, move_dir, swap_files,
     };
     use crate::io::hash::sha_256;
     use crate::io::zip::unzip;
@@ -505,6 +505,23 @@ pub mod updater {
             };
             Ok(())
         }
+
+        pub fn try_self_care(&mut self) -> Result<(), BootstrapError> {
+            use std::fs::remove_file;
+            let mut new_bootstrapper = self.install_info.path.clone();
+            let mut old_bootstrapper = self.install_info.path.clone();
+            let current_exe = get_filename(&std::env::current_exe()?);
+            new_bootstrapper.push(format!("{}_new", current_exe));
+            old_bootstrapper.push(format!("{}_old", current_exe));
+            if old_bootstrapper.exists() {
+                remove_file(&old_bootstrapper)?;
+            }
+            if !new_bootstrapper.exists() {
+                return Ok(());
+            }
+            swap_files(&std::env::current_exe()?, &new_bootstrapper)?;
+            Ok(())
+        }
     }
 
     #[derive(Default, Copy, Clone)]
@@ -667,7 +684,9 @@ pub mod updater {
         };
         log::info!("current_exe == {}", &current_exe);
         let log_file = format!("{}", current_exe.replace(".exe", ".log"));
-        let ignored_files = vec![current_exe, log_file];
+        let old_file = format!("{}_old", current_exe);
+        let new_file = format!("{}_new", current_exe);
+        let ignored_files = vec![current_exe, log_file, old_file, new_file];
 
         log::debug!("update_staging_path == {}", &update_staging_path.display());
 
@@ -808,5 +827,4 @@ pub mod updater {
             .into_iter()
             .any(|u| u.name == env!("UNINSTALL_KEY")))
     }
-
 }

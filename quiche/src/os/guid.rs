@@ -80,7 +80,14 @@ impl Guid {
 
         // https://i.imgur.com/JA1y4DR.png
         let formatted = if !guid_str.starts_with('{') && !guid_str.contains('-') {
-            format!("{{{}-{}-{}-{}-{}}}", &guid_str[0..8], &guid_str[8..12], &guid_str[12..16], &guid_str[16..20], &guid_str[20..GUID_N_CHARACTERS])
+            format!(
+                "{{{}-{}-{}-{}-{}}}",
+                &guid_str[0..8],
+                &guid_str[8..12],
+                &guid_str[12..16],
+                &guid_str[16..20],
+                &guid_str[20..GUID_N_CHARACTERS]
+            )
         } else {
             guid_str.to_string()
         };

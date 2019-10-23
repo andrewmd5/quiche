@@ -22,7 +22,7 @@ pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
 /// launches the Rainway service (Radar)
 pub fn launch_rainway() {
     match start_service(env!("RAINWAY_SERVICE")) {
-        Ok(s) => log::info!("Rainway started: {}", s),
+        Ok(s) => log::info!("Rainway service started: {}", s),
         Err(e) => {
             show_error("Rainway Startup Failure", format!("{}", e));
             sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);

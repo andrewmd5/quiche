@@ -16,9 +16,9 @@ pub fn verify_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUp
     );
 }
 
-pub fn launch_and_close<T: 'static>(webview: &mut WebView<'_, T>) {
+pub fn launch_and_close<T: 'static>(_webview: &mut WebView<'_, T>) {
     launch_rainway();
-    webview.terminate();
+    std::process::exit(0);
 }
 
 pub fn apply_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
