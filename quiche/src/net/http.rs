@@ -144,11 +144,12 @@ pub fn download_file(
         path.display()
     );
 
-    match copy(&mut source, &mut temp_file) {
+    let r = match copy(&mut source, &mut temp_file) {
         Err(e) => return Err(BootstrapError::IOError(e)),
-        Ok(r) => {
-            log::info!("downloaded {} bytes.", r);
-            return Ok(r == total_size);
-        }
+        Ok(r) => r
     };
+
+    drop(temp_file);
+    log::info!("downloaded {} bytes.", r);
+    Ok(r == total_size)
 }

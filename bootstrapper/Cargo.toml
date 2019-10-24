@@ -1,8 +1,14 @@
 [package]
 name = "bootstrapper"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Andrew Sampson <andrew@rainway.io>"]
 edition = "2018"
+
+[package.metadata.winres]
+OriginalFilename = "bootstrapper.exe"
+LegalCopyright = "Copyright © 2019"
+FileDescription = "A bootstrapping application which installs/updates Rainway"
+ProductName = "Rainway Bootstrapper"
 
 [package.rainway]
 media_pack_url = "https://www.microsoft.com/en-us/software-download/mediafeaturepack"
