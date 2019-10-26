@@ -19,10 +19,6 @@ jobs:
       - run: DIR
       - run: COPY target\i686-pc-windows-msvc\release\bootstrapper.exe bootstrapper_release\bootstrapper.exe
       - run: COPY target\i686-pc-windows-msvc\release\cli.exe bootstrapper_release\cli.exe
-      - run: |
-          $test = (Get-Command bootstrapper_release\bootstrapper.exe).Version
-          Write-Host $test
-        shell: pwsh
       - uses: actions/upload-artifact@master
         with:
           name: artifacts
@@ -44,10 +40,6 @@ jobs:
       - run: DIR
       - run: COPY target\i686-pc-windows-msvc\debug\bootstrapper.exe bootstrapper_debug\bootstrapper.exe
       - run: COPY target\i686-pc-windows-msvc\debug\bootstrapper.exe bootstrapper_debug\cli.exe
-      - run: |
-          $test = (Get-Command bootstrapper_debug\bootstrapper.exe).Version
-          Write-Host $test
-        shell: pwsh
       - uses: actions/upload-artifact@master
         with:
           name: artifacts
