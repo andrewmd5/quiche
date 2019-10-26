@@ -189,6 +189,22 @@ pub fn get_uninstallers() -> Result<Vec<InstalledApp>, BootstrapError> {
     Ok(uninstallers)
 }
 
+pub fn get_dotnet_framework_version() -> Option<u32> {
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let u_key = "SOFTWARE\\Microsoft\\NET Framework Setup\\NDP\\v4\\Full";
+    let full = match hklm.open_subkey(u_key) {
+        Err(_e) => {
+            return None //.NET Framework 4.5 or later is not installed.
+        }
+        Ok(o) => o,
+    };
+    let version: u32 = match full.get_value("Release") {
+        Err(_error) => return None,
+        Ok(p) => p,
+    };
+    Some(version)
+}
+
 /// Returns a list of uninstallers for a given registry key
 fn get_uninstallers_from_key(handle: RegistryHandle) -> Result<Vec<InstalledApp>, BootstrapError> {
     let u_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";

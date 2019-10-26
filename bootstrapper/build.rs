@@ -35,6 +35,10 @@ fn main() {
         find_cargo_field("media_pack_url")
     );
     println!(
+        "cargo:rustc-env=DOTNET_URL={}",
+        find_cargo_field("dotnet_framework_url")
+    );
+    println!(
         "cargo:rustc-env=SENTRY_DNS={}",
         find_cargo_field("sentry_dns")
     );

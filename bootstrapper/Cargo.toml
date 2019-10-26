@@ -11,6 +11,7 @@ FileDescription = "A bootstrapping application which installs/updates Rainway"
 ProductName = "Rainway Bootstrapper"
 
 [package.rainway]
+dotnet_framework_url = "https://dotnet.microsoft.com/download/thank-you/net472"
 media_pack_url = "https://www.microsoft.com/en-us/software-download/mediafeaturepack"
 sentry_dns = "https://f3f4e8ff17b04538bffd1e8794e1dc05@sentry.io/1548204"
 service_name = "RainwayRadar"

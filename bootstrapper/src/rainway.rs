@@ -2,7 +2,7 @@ use crate::ui::messagebox::show_error;
 use quiche::etc::constants::BootstrapError;
 use quiche::os::process::get_processes;
 use quiche::os::service::start_service;
-use quiche::os::windows::{get_system_info, needs_media_pack};
+use quiche::os::windows::{get_dotnet_framework_version, get_system_info, needs_media_pack};
 use std::process;
 /// returns an error if the bootstrapper is already open
 pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
@@ -72,6 +72,16 @@ pub fn check_system_compatibility() -> Result<(), BootstrapError> {
             ));
         }
     }
+
+    let dotnet = get_dotnet_framework_version();
+    if dotnet.is_none() {
+        return Err(BootstrapError::NeedDotNetFramework);
+    }
+    let dotnet_version  = dotnet.unwrap_or_default();
+    if dotnet_version < 461808 {
+        return Err(BootstrapError::NeedDotNetFramework);
+    } 
+    log::info!("The current .NET Framework version is: {}", dotnet_version);
     log::info!("current system is compatible.");
     Ok(())
 }

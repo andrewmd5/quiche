@@ -44,6 +44,10 @@ fn main() -> Result<(), BootstrapError> {
             BootstrapError::NeedWindowsMediaPack(_) => {
                 show_error_with_url(CAPTION, format!("{}", e), env!("MEDIA_PACK_URL"));
                 panic!("{}", e);
+            },
+            BootstrapError::NeedDotNetFramework => {
+                show_error_with_url(CAPTION, format!("{}", e), env!("DOTNET_URL"));
+                panic!("{}", e);
             }
             _ => {
                 show_error(CAPTION, format!("{}", e));
