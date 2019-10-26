@@ -293,7 +293,7 @@ pub mod updater {
     use crate::net::http::{download_file, download_toml};
     use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle};
     use serde::{Deserialize, Serialize};
-    use std::fs::remove_dir_all;
+    use std::fs::{remove_dir_all, create_dir_all};
 
     use std::{
         env::{temp_dir, var},
@@ -492,8 +492,10 @@ pub mod updater {
             }
 
             let path = to_slash(&PathBuf::from(&uninstaller.install_location));
-            if !path.is_dir() || !path.exists() {
-                return Err(BootstrapError::InstallPathMissing);
+            // Knagie pointed out this probably should not be a fatal failure.
+            // If the install path is known, but it was deleted, we can just recreate it.
+            if !path.exists() {
+               create_dir_all(&path)?;
             }
             self.install_info = InstallInfo {
                 version: uninstaller.version,
