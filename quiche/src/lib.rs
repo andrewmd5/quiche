@@ -314,7 +314,7 @@ pub mod updater {
         pub registry_handle: RegistryHandle,
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     pub enum UpdateType {
         /// An install requires us to run the full Rainway installer,
         /// becasuse Rainway itself is not installed.
@@ -802,7 +802,7 @@ pub mod updater {
         download_path.push(update.get_temp_name());
         log::info!("running {}", &download_path.display());
         let results = Command::new(download_path)
-            .args(&[""])
+            .args(&["/qn"])
             .creation_flags(0x08000000)
             .output()
             .map_err(|err| BootstrapError::InstallationFailed(err.to_string()).to_string())

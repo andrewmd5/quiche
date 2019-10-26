@@ -206,7 +206,11 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
             apply_update(webview, update);
         }
         "launch" => {
-            launch_and_close(webview);
+            if update.update_type != UpdateType::Install {
+                 launch_and_close(webview);
+            } else {
+                 std::process::exit(0);
+            }
         }
         "minimize" => {
             webview.minimize();
