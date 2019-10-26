@@ -7,7 +7,7 @@ edition = "2018"
 [package.metadata.winres]
 OriginalFilename = "bootstrapper.exe"
 LegalCopyright = "Copyright © 2019"
-FileDescription = "A bootstrapping application which installs/updates Rainway"
+FileDescription = "Rainway Bootstrapper"
 ProductName = "Rainway Bootstrapper"
 
 [package.rainway]
