@@ -14,11 +14,18 @@ jobs:
         run: cargo build --target=i686-pc-windows-msvc --release --verbose
       - name: Run tests
         run: cargo test --verbose
-      - run: if exist bootstrapper_release RMDIR bootstrapper_release /S /Q
-      - run: MKDIR bootstrapper_release
-      - run: DIR
-      - run: COPY target\i686-pc-windows-msvc\release\bootstrapper.exe bootstrapper_release\bootstrapper.exe
-      - run: COPY target\i686-pc-windows-msvc\release\cli.exe bootstrapper_release\cli.exe
+      - name: Clean artifacts directory
+        run: if exist bootstrapper_release RMDIR bootstrapper_release /S /Q
+        shell: cmd
+      - name: Create artifacts directory
+        run: MKDIR bootstrapper_release
+        shell: cmd
+      - name: Copy Bootstrapper
+        run: COPY target\i686-pc-windows-msvc\release\bootstrapper.exe bootstrapper_release\bootstrapper.exe
+        shell: cmd
+      - name: Copy CLI
+        run: COPY target\i686-pc-windows-msvc\release\cli.exe bootstrapper_release\cli.exe
+        shell: cmd
       - uses: actions/upload-artifact@master
         with:
           name: artifacts
@@ -35,11 +42,18 @@ jobs:
         run: cargo build --target=i686-pc-windows-msvc --verbose
       - name: Run tests
         run: cargo test --verbose
-      - run: if exist bootstrapper_debug RMDIR bootstrapper_debug /S /Q
-      - run: MKDIR bootstrapper_debug
-      - run: DIR
-      - run: COPY target\i686-pc-windows-msvc\debug\bootstrapper.exe bootstrapper_debug\bootstrapper.exe
-      - run: COPY target\i686-pc-windows-msvc\debug\bootstrapper.exe bootstrapper_debug\cli.exe
+      - name: Clean artifacts directory
+        run: if exist bootstrapper_debug RMDIR bootstrapper_debug /S /Q
+        shell: cmd
+      - name: Create artifacts directory
+        run: MKDIR bootstrapper_debug
+        shell: cmd
+      - name: Copy Bootstrapper
+        run: COPY target\i686-pc-windows-msvc\debug\bootstrapper.exe bootstrapper_debug\bootstrapper.exe
+        shell: cmd
+      - name: Copy CLI
+        run: COPY target\i686-pc-windows-msvc\debug\cli.exe bootstrapper_debug\cli.exe
+        shell: cmd
       - uses: actions/upload-artifact@master
         with:
           name: artifacts
