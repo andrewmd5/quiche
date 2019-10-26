@@ -1,5 +1,7 @@
 use crate::etc::constants::BootstrapError;
 use regex::Regex;
+use winapi::um::winnt::KEY_READ;
+use winapi::um::winnt::KEY_WOW64_64KEY;
 use winreg::enums::KEY_ALL_ACCESS;
 use winreg::types::ToRegValue;
 use winreg::HKEY;
@@ -28,7 +30,7 @@ pub struct SystemInfo {
 /// Windows use the opaque handle scheme that most operating systems use.
 /// When requesting resources from the operating system, you are given a "handle" or cookie that represents the real object.
 /// By supplying one of these handles to the registry we can scoped data.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(overflowing_literals)]
 pub enum RegistryHandle {
     CurrentUser = 0x80000001i32 as isize,
@@ -167,7 +169,7 @@ pub fn set_uninstall_value<T: ToRegValue>(
 ) -> Result<(), BootstrapError> {
     let u_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
     let hkey = RegKey::predef(handle as isize as HKEY);
-    let uninstall_key = match hkey.open_subkey(u_key) {
+    let uninstall_key = match hkey.open_subkey_with_flags(u_key, KEY_READ | KEY_WOW64_64KEY) {
         Ok(u) => u,
         Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(u_key.to_string())),
     };
@@ -194,7 +196,7 @@ pub fn get_dotnet_framework_version() -> Option<u32> {
     let u_key = "SOFTWARE\\Microsoft\\NET Framework Setup\\NDP\\v4\\Full";
     let full = match hklm.open_subkey(u_key) {
         Err(_e) => {
-            return None //.NET Framework 4.5 or later is not installed.
+            return None; //.NET Framework 4.5 or later is not installed.
         }
         Ok(o) => o,
     };
@@ -209,7 +211,7 @@ pub fn get_dotnet_framework_version() -> Option<u32> {
 fn get_uninstallers_from_key(handle: RegistryHandle) -> Result<Vec<InstalledApp>, BootstrapError> {
     let u_key = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
     let hkey = RegKey::predef(handle as isize as HKEY);
-    let uninstall_key = match hkey.open_subkey(u_key) {
+    let uninstall_key = match hkey.open_subkey_with_flags(u_key, KEY_READ | KEY_WOW64_64KEY) {
         Ok(u) => u,
         Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(u_key.to_string())),
     };
@@ -220,6 +222,7 @@ fn get_uninstallers_from_key(handle: RegistryHandle) -> Result<Vec<InstalledApp>
         .filter(|x| !x.trim().is_empty())
     {
         if let Ok(install_key) = uninstall_key.open_subkey(&key) {
+
             let mut app = InstalledApp::default();
 
             app.name = install_key.get_value("DisplayName").unwrap_or_default();

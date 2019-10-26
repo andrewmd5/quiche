@@ -60,6 +60,7 @@ fn main() -> Result<(), BootstrapError> {
 }
 
 fn run() -> Result<(), BootstrapError> {
+    
     if let Err(e) = error_on_duplicate_session() {
         log::error!("found another bootstrapper session. killing session.");
         return Err(e);

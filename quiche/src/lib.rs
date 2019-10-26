@@ -479,7 +479,7 @@ pub mod updater {
             let uninstallers = get_uninstallers()?;
             let uninstaller = match uninstallers
                 .into_iter()
-                .find(|u| u.name == env!("UNINSTALL_KEY"))
+                .find(|u| u.key == env!("UNINSTALL_KEY"))
             {
                 Some(u) => u,
                 None => return Err(BootstrapError::UninstallEntryMissing),
@@ -825,6 +825,6 @@ pub mod updater {
         let uninstallers = get_uninstallers()?;
         Ok(uninstallers
             .into_iter()
-            .any(|u| u.name == env!("UNINSTALL_KEY")))
+            .any(|u| u.key == env!("UNINSTALL_KEY")))
     }
 }
