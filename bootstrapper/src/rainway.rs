@@ -77,10 +77,10 @@ pub fn check_system_compatibility() -> Result<(), BootstrapError> {
     if dotnet.is_none() {
         return Err(BootstrapError::NeedDotNetFramework);
     }
-    let dotnet_version  = dotnet.unwrap_or_default();
+    let dotnet_version = dotnet.unwrap_or_default();
     if dotnet_version < 461808 {
         return Err(BootstrapError::NeedDotNetFramework);
-    } 
+    }
     log::info!("The current .NET Framework version is: {}", dotnet_version);
     log::info!("current system is compatible.");
     Ok(())

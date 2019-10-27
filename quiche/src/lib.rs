@@ -293,7 +293,7 @@ pub mod updater {
     use crate::net::http::{download_file, download_toml};
     use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle};
     use serde::{Deserialize, Serialize};
-    use std::fs::{remove_dir_all, create_dir_all};
+    use std::fs::{create_dir_all, remove_dir_all};
 
     use std::{
         env::{temp_dir, var},
@@ -495,7 +495,7 @@ pub mod updater {
             // Knagie pointed out this probably should not be a fatal failure.
             // If the install path is known, but it was deleted, we can just recreate it.
             if !path.exists() {
-               create_dir_all(&path)?;
+                create_dir_all(&path)?;
             }
             self.install_info = InstallInfo {
                 version: uninstaller.version,

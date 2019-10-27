@@ -11,12 +11,12 @@ use rainway::{
 };
 
 use quiche::io::ico::IconDir;
+use quiche::os::windows::detach_rdp_session;
 use quiche::updater::{is_installed, ActiveUpdate, UpdateType};
+use rust_embed::RustEmbed;
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
 use ui::window::set_dpi_aware;
-
-use rust_embed::RustEmbed;
 use web_view::{Content, Icon, WVResult, WebView};
 #[derive(RustEmbed)]
 #[folder = "resources/"]
@@ -44,7 +44,7 @@ fn main() -> Result<(), BootstrapError> {
             BootstrapError::NeedWindowsMediaPack(_) => {
                 show_error_with_url(CAPTION, format!("{}", e), env!("MEDIA_PACK_URL"));
                 panic!("{}", e);
-            },
+            }
             BootstrapError::NeedDotNetFramework => {
                 show_error_with_url(CAPTION, format!("{}", e), env!("DOTNET_URL"));
                 panic!("{}", e);
@@ -60,13 +60,20 @@ fn main() -> Result<(), BootstrapError> {
 }
 
 fn run() -> Result<(), BootstrapError> {
-    
+
     if let Err(e) = error_on_duplicate_session() {
         log::error!("found another bootstrapper session. killing session.");
         return Err(e);
     }
 
+    if detach_rdp_session() {
+        log::info!("Session was detached");
+    } else {
+        log::info!("Failed or not need to detach session.");
+    }
+
     kill_rainway();
+
 
     let mut update = ActiveUpdate::default();
     let rainway_installed = is_installed()?;
@@ -207,9 +214,9 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         }
         "launch" => {
             if update.update_type != UpdateType::Install {
-                 launch_and_close(webview);
+                launch_and_close(webview);
             } else {
-                 std::process::exit(0);
+                std::process::exit(0);
             }
         }
         "minimize" => {

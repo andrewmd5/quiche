@@ -8,7 +8,9 @@ use winapi::shared::winerror::{ERROR_MORE_DATA, ERROR_NO_MORE_FILES};
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
 use winapi::um::minwinbase::STILL_ACTIVE;
-use winapi::um::processthreadsapi::{GetExitCodeProcess, OpenProcess, TerminateProcess};
+use winapi::um::processthreadsapi::{
+    GetCurrentProcessId, GetExitCodeProcess, OpenProcess, ProcessIdToSessionId, TerminateProcess,
+};
 use winapi::um::restartmanager::{
     RmEndSession, RmGetList, RmRebootReasonNone, RmRegisterResources, RmStartSession,
     RM_PROCESS_INFO,
@@ -43,6 +45,18 @@ impl Process {
     /// Gets the process name.
     pub fn name(&self) -> &str {
         return self.name.as_str();
+    }
+
+    /// Retrieves the Remote Desktop Services session associated with a specified process.
+    pub fn session_id(&self) -> u32 {
+        unsafe {
+            let mut session_id = 0;
+            let r = ProcessIdToSessionId(self.id(), &mut session_id);
+            if r != 0 {
+                return session_id;
+            }
+            0
+        }
     }
 
     /// Kills the underlying process with prodigious.
@@ -84,6 +98,21 @@ impl Process {
         }
     }
 }
+
+pub fn get_current_process() -> Option<Process> {
+    unsafe {
+        let pid = GetCurrentProcessId();
+        if let Some(processes) = get_processes() {
+            for p in processes {
+                if p.id() == pid {
+                    return Some(p);
+                }
+            }
+        }
+        None
+    }
+}
+
 /// Returns a list of processes running on the system.
 /// will return `None` if there was an issue generating a snapshot from the Windows API
 pub fn get_processes() -> Option<Vec<Process>> {

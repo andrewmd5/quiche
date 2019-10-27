@@ -146,7 +146,7 @@ pub fn download_file(
 
     let r = match copy(&mut source, &mut temp_file) {
         Err(e) => return Err(BootstrapError::IOError(e)),
-        Ok(r) => r
+        Ok(r) => r,
     };
 
     drop(temp_file);

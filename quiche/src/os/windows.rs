@@ -1,7 +1,11 @@
 use crate::etc::constants::BootstrapError;
+use crate::os::process::get_current_process;
 use regex::Regex;
+use std::env::var_os;
+use std::path::PathBuf;
 use winapi::um::winnt::KEY_READ;
 use winapi::um::winnt::KEY_WOW64_64KEY;
+use winapi::um::winuser::{GetSystemMetrics, SM_REMOTESESSION};
 use winreg::enums::KEY_ALL_ACCESS;
 use winreg::types::ToRegValue;
 use winreg::HKEY;
@@ -160,6 +164,65 @@ pub fn needs_media_pack() -> Result<bool, BootstrapError> {
     }
     Ok(true)
 }
+/// determines if your application is running in a remote session.
+/// if the ID of the current session in which the application is running is the same as in the registry key, 
+/// the application is running in a local session. Sessions identified as remote session in this way include 
+/// remote sessions that use RemoteFX vGPU. 
+pub fn is_current_session_remoteable() -> bool {
+    unsafe {
+        if GetSystemMetrics(SM_REMOTESESSION) != 0 {
+            return true;
+        }
+        // RemoteFX vGPU now we need to check for RemoteFX vGPU
+        let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+        let terminal_server_key = "SYSTEM\\CurrentControlSet\\Control\\Terminal Server";
+        let terminal_server = match hklm.open_subkey(terminal_server_key) {
+            Err(_e) => {
+                return false;
+            }
+            Ok(o) => o,
+        };
+        let glass_session_id: u32 = match terminal_server.get_value("GlassSessionId") {
+            Err(_error) => return false,
+            Ok(p) => p,
+        };
+        if let Some(p) = get_current_process() {
+            return p.session_id() != glass_session_id;
+        }
+        false
+    }
+}
+/// if we are running in a remote sesssion, detach the RDP session so applications can
+/// be launched into a non-system context from a service.
+pub fn detach_rdp_session() -> bool {
+    use std::os::windows::process::CommandExt;
+    use std::process::Command;
+    if is_current_session_remoteable() {
+        let key = "WINDIR";
+        let mut tscon_path = match var_os(key) {
+            Some(val) => PathBuf::from(val), //add the Windows path
+            None => return false,
+        };
+        tscon_path.push("System32");
+        tscon_path.push("tscon.exe");
+        if tscon_path.exists() && tscon_path.is_file() {
+            log::info!("Found tscon at {}", &tscon_path.display());
+            if let Some(p) = get_current_process() {
+                let session_id = format!("{}", p.session_id());
+                log::info!("Current session ID is: {}", session_id);
+                let result = match Command::new(&tscon_path)
+                    .args(&[session_id, "/dest:console".to_string()])
+                    .creation_flags(0x08000000)
+                    .output()
+                {
+                    Ok(o) => return true,
+                    Err(e) => return false,
+                };
+            }
+        }
+    }
+    false
+}
 
 pub fn set_uninstall_value<T: ToRegValue>(
     name: &str,
@@ -222,7 +285,6 @@ fn get_uninstallers_from_key(handle: RegistryHandle) -> Result<Vec<InstalledApp>
         .filter(|x| !x.trim().is_empty())
     {
         if let Ok(install_key) = uninstall_key.open_subkey(&key) {
-
             let mut app = InstalledApp::default();
 
             app.name = install_key.get_value("DisplayName").unwrap_or_default();
