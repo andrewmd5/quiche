@@ -60,7 +60,6 @@ fn main() -> Result<(), BootstrapError> {
 }
 
 fn run() -> Result<(), BootstrapError> {
-
     if let Err(e) = error_on_duplicate_session() {
         log::error!("found another bootstrapper session. killing session.");
         return Err(e);
@@ -73,7 +72,6 @@ fn run() -> Result<(), BootstrapError> {
     }
 
     kill_rainway();
-
 
     let mut update = ActiveUpdate::default();
     let rainway_installed = is_installed()?;

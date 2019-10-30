@@ -2,7 +2,9 @@ use crate::ui::messagebox::show_error;
 use quiche::etc::constants::BootstrapError;
 use quiche::os::process::get_processes;
 use quiche::os::service::start_service;
-use quiche::os::windows::{get_dotnet_framework_version, get_system_info, needs_media_pack, detach_rdp_session};
+use quiche::os::windows::{
+    detach_rdp_session, get_dotnet_framework_version, get_system_info, needs_media_pack,
+};
 use std::process;
 /// returns an error if the bootstrapper is already open
 pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
@@ -21,7 +23,6 @@ pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
 
 /// launches the Rainway service (Radar)
 pub fn launch_rainway() {
-    
     if detach_rdp_session() {
         log::info!("Session was detached");
     } else {

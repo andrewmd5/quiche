@@ -291,7 +291,7 @@ pub mod updater {
     use crate::io::hash::sha_256;
     use crate::io::zip::unzip;
     use crate::net::http::{download_file, download_toml};
-    use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle};
+    use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle, unblock_file, unblock_path};
     use serde::{Deserialize, Serialize};
     use std::fs::{create_dir_all, remove_dir_all};
 
@@ -661,6 +661,10 @@ pub mod updater {
             .map_err(|err| format!("{}", err))
             .map(|output| format!("{}", output));
 
+        if results.is_ok() {
+            log::info!("unblocking {}", &download_path.display());
+            unblock_file(download_path);
+        }
         let _res = child.join();
         log::info!("download background thread finished.");
         results
@@ -785,6 +789,12 @@ pub mod updater {
                 log::error!("failed to rollback update.")
             }
             return Err(BootstrapError::InstallationFailed(update_error_message).to_string());
+        }
+
+       if let Ok(o) = unblock_path(&update.install_info.path) {
+             log::info!("unblocked the install path.");
+        } else {
+              log::info!("failed to unblock the install path");
         }
         log::info!("update went off without a hitch.");
 

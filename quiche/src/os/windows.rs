@@ -1,8 +1,11 @@
 use crate::etc::constants::BootstrapError;
+use crate::io::disk::get_dir_files;
 use crate::os::process::get_current_process;
 use regex::Regex;
 use std::env::var_os;
+use std::io::{Error, ErrorKind};
 use std::path::PathBuf;
+use winapi::um::fileapi::DeleteFileW;
 use winapi::um::winnt::KEY_READ;
 use winapi::um::winnt::KEY_WOW64_64KEY;
 use winapi::um::winuser::{GetSystemMetrics, SM_REMOTESESSION};
@@ -165,9 +168,9 @@ pub fn needs_media_pack() -> Result<bool, BootstrapError> {
     Ok(true)
 }
 /// determines if your application is running in a remote session.
-/// if the ID of the current session in which the application is running is the same as in the registry key, 
-/// the application is running in a local session. Sessions identified as remote session in this way include 
-/// remote sessions that use RemoteFX vGPU. 
+/// if the ID of the current session in which the application is running is the same as in the registry key,
+/// the application is running in a local session. Sessions identified as remote session in this way include
+/// remote sessions that use RemoteFX vGPU.
 pub fn is_current_session_remoteable() -> bool {
     unsafe {
         if GetSystemMetrics(SM_REMOTESESSION) != 0 {
@@ -268,6 +271,32 @@ pub fn get_dotnet_framework_version() -> Option<u32> {
         Ok(p) => p,
     };
     Some(version)
+}
+
+pub fn unblock_file(file: PathBuf) {
+    if file.exists() && file.is_file() {
+        let mut os_string = file.into_os_string().into_string().unwrap();
+        os_string.push_str(":Zone.Identifier");
+        unsafe {
+            let file_name: Vec<_> = os_string.encode_utf16().chain(Some(0)).collect();
+            DeleteFileW(file_name.as_ptr());
+        }
+    }
+}
+
+pub fn unblock_path(path: &PathBuf) -> Result<(), Error> {
+    if !path.exists() {
+        return Err(Error::from(ErrorKind::NotFound));
+    }
+    if !path.is_dir() {
+        return Err(Error::from(ErrorKind::InvalidInput));
+    }
+    let files = get_dir_files(&path)?;
+    for file in files {
+        let file_path = PathBuf::from(&file);
+        unblock_file(file_path);
+    }
+    Ok(())
 }
 
 /// Returns a list of uninstallers for a given registry key
