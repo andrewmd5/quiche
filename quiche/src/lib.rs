@@ -291,7 +291,8 @@ pub mod updater {
     use crate::io::hash::sha_256;
     use crate::io::zip::unzip;
     use crate::net::http::{download_file, download_toml};
-    use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle, unblock_file, unblock_path};
+    use crate::os::files::{unblock_file, unblock_path, take_ownership_of_dir, grant_full_permissions};
+    use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle};
     use serde::{Deserialize, Serialize};
     use std::fs::{create_dir_all, remove_dir_all};
 
@@ -791,11 +792,26 @@ pub mod updater {
             return Err(BootstrapError::InstallationFailed(update_error_message).to_string());
         }
 
-       if let Ok(o) = unblock_path(&update.install_info.path) {
-             log::info!("unblocked the install path.");
+        if let Ok(o) = unblock_path(&update.install_info.path) {
+            log::info!("unblocked the install path.");
         } else {
-              log::info!("failed to unblock the install path");
+            log::info!("failed to unblock the install path");
         }
+
+
+        if take_ownership_of_dir(&update.install_info.path) {
+            log::info!("took ownership of the install path.");
+        } else {
+            log::info!("could take not ownership of the install path.");
+        }
+
+        if grant_full_permissions(&update.install_info.path) {
+            log::info!("granted full permissions to the install path.");
+        } else {
+            log::info!("unable to grant full permissions to the install path.");
+        }
+
+        
         log::info!("update went off without a hitch.");
 
         update.update_display_version();

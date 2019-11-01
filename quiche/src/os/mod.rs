@@ -1,3 +1,4 @@
+pub mod files;
 pub mod guid;
 pub mod process;
 pub mod service;
