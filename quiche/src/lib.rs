@@ -792,7 +792,7 @@ pub mod updater {
             return Err(BootstrapError::InstallationFailed(update_error_message).to_string());
         }
 
-        if let Ok(o) = unblock_path(&update.install_info.path) {
+        if let Ok(_o) = unblock_path(&update.install_info.path) {
             log::info!("unblocked the install path.");
         } else {
             log::info!("failed to unblock the install path");

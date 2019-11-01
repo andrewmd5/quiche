@@ -209,13 +209,13 @@ pub fn detach_rdp_session() -> bool {
             if let Some(p) = get_current_process() {
                 let session_id = format!("{}", p.session_id());
                 log::info!("Current session ID is: {}", session_id);
-                let result = match Command::new(&tscon_path)
+                match Command::new(&tscon_path)
                     .args(&[session_id, "/dest:console".to_string()])
                     .creation_flags(0x08000000)
                     .output()
                 {
-                    Ok(o) => return true,
-                    Err(e) => return false,
+                    Ok(_o) => return true,
+                    Err(_e) => return false,
                 };
             }
         }
