@@ -176,7 +176,9 @@ fn link_file(from: &Path, to: &Path, copy_file: bool) -> Result<(), Error> {
     if copy_file {
         copy(&from, &to)?;
     } else {
-        rename(&from, &to)?;
+        // we need to copy first then remove just incase the files are on different disk.
+        copy(&from, &to)?;
+        remove_file(&from)?;
     }
     Ok(())
 }
