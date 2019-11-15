@@ -80,7 +80,7 @@ fn run() -> Result<(), BootstrapError> {
         update.update_type = UpdateType::Install;
     } else {
         if let Err(e) = update.get_install_info() {
-            launch_rainway();
+            launch_rainway(&update.install_info.path);
             return Err(e);
         }
         if let Err(e) = update.try_self_care() {
@@ -102,7 +102,7 @@ fn run() -> Result<(), BootstrapError> {
     if let Err(e) = update.get_manifest(config_branch) {
         if rainway_installed {
             log::error!("unable to check for latest branch. starting currently installed version.");
-            launch_rainway();
+            launch_rainway(&update.install_info.path);
             sentry::capture_message(
                 format!("Failed to fetch branch {}. {}", config_branch, e).as_str(),
                 sentry::Level::Error,
@@ -121,7 +121,7 @@ fn run() -> Result<(), BootstrapError> {
         let valid = update.validate();
         if valid {
             log::info!("Rainway is not outdated, starting.");
-            launch_rainway();
+            launch_rainway(&update.install_info.path);
             return Ok(());
         }
         log::warn!("the current Rainway installation requires an update.");
@@ -212,7 +212,7 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
         }
         "launch" => {
             if update.update_type != UpdateType::Install {
-                launch_and_close(webview);
+                launch_and_close(webview, update);
             } else {
                 std::process::exit(0);
             }

@@ -1,10 +1,11 @@
 use crate::ui::messagebox::show_error;
 use quiche::etc::constants::BootstrapError;
 use quiche::os::process::get_processes;
-use quiche::os::service::start_service;
+use quiche::os::service::{install_service, service_exist, start_service, WindowsService};
 use quiche::os::windows::{
     detach_rdp_session, get_dotnet_framework_version, get_system_info, needs_media_pack,
 };
+use std::path::PathBuf;
 use std::process;
 /// returns an error if the bootstrapper is already open
 pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
@@ -22,17 +23,38 @@ pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
 }
 
 /// launches the Rainway service (Radar)
-pub fn launch_rainway() {
+pub fn launch_rainway(install_path: &PathBuf) {
     if detach_rdp_session() {
         log::info!("Session was detached");
     } else {
         log::info!("Failed or not need to detach session.");
     }
-    match start_service(env!("RAINWAY_SERVICE")) {
-        Ok(s) => log::info!("Rainway service started: {}", s),
-        Err(e) => {
-            show_error("Rainway Startup Failure", format!("{}", e));
-            sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
+    if !service_exist(env!("RAINWAY_SERVICE")) {
+        let mut exe = install_path.to_path_buf();
+        exe.push("radar\\Radar.exe");
+        if exe.exists() && exe.is_file() {
+            let service = WindowsService {
+                name: env!("RAINWAY_SERVICE").to_string(),
+                display_name: "Rainway Radar".to_string(),
+                arguments: vec![],
+                executable_path: exe,
+            };
+            match install_service(service) {
+                Ok(s) => log::info!("Rainway service installed: {}", s),
+                Err(e) => {
+                    show_error("Rainway Startup Failure", format!("{}", e));
+                    sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
+                }
+            }
+        }
+    }
+    if service_exist(env!("RAINWAY_SERVICE")) {
+        match start_service(env!("RAINWAY_SERVICE")) {
+            Ok(s) => log::info!("Rainway service started: {}", s),
+            Err(e) => {
+                show_error("Rainway Startup Failure", format!("{}", e));
+                sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
+            }
         }
     }
 }
