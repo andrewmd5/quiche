@@ -9,7 +9,7 @@ use winapi::um::processthreadsapi::{GetCurrentProcess, OpenProcessToken};
 use winapi::um::securitybaseapi::{
     AllocateAndInitializeSid, CheckTokenMembership, FreeSid, GetTokenInformation,
 };
-use winapi::um::winnt::{TokenElevation, HANDLE, TOKEN_ELEVATION, TOKEN_QUERY, SID_IDENTIFIER_AUTHORITY, SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, KEY_WOW64_64KEY, KEY_READ. DOMAIN_ALIAS_RID_ADMINS};
+use winapi::um::winnt::{TokenElevation, HANDLE, TOKEN_ELEVATION, TOKEN_QUERY, SID_IDENTIFIER_AUTHORITY, SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, KEY_WOW64_64KEY, KEY_READ, DOMAIN_ALIAS_RID_ADMINS};
 use winapi::um::winuser::{GetSystemMetrics, SM_REMOTESESSION};
 use winreg::enums::HKEY_LOCAL_MACHINE;
 use winreg::enums::KEY_ALL_ACCESS;
