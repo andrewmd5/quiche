@@ -1,6 +1,6 @@
 use quiche::os::windows::is_run_as_admin;
 use std::ffi::CString;
-use std::{env, ptr};
+use std::{ptr};
 use winapi::shared::winerror::SUCCEEDED;
 use winapi::um::combaseapi::{CoInitializeEx, CoUninitialize};
 use winapi::um::libloaderapi::GetModuleFileNameW;
