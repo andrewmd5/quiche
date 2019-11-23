@@ -56,13 +56,11 @@ pub fn try_elevate() -> bool {
         if is_run_as_admin() {
             return false;
         }
-        if let Ok(exe) = env::current_exe() {
-            let mut buf = Vec::with_capacity(255);
-            let ret = GetModuleFileNameW(ptr::null_mut(), buf.as_mut_ptr(), 255) as usize;
-            if ret != 0 {
-                buf.set_len(ret);
-                return run_as(&buf);
-            }
+        let mut buf = Vec::with_capacity(255);
+        let ret = GetModuleFileNameW(ptr::null_mut(), buf.as_mut_ptr(), 255) as usize;
+        if ret != 0 {
+            buf.set_len(ret);
+            return run_as(&buf);
         }
         false
     }
