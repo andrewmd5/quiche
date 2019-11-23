@@ -1,6 +1,6 @@
 use crate::ui::messagebox::show_error;
 use quiche::etc::constants::BootstrapError;
-use quiche::os::process::get_processes;
+use quiche::os::process::{get_processes, get_current_process};
 use quiche::os::service::{install_service, service_exist, start_service, WindowsService};
 use quiche::os::windows::{
     detach_rdp_session, get_dotnet_framework_version, get_system_info, needs_media_pack,
@@ -62,12 +62,14 @@ pub fn launch_rainway(install_path: &PathBuf) {
 /// kills all associated Rainway processes
 pub fn kill_rainway() {
     if let Some(process_list) = get_processes() {
+        let current_process = get_current_process().unwrap();
         for process in process_list {
             if process.name() == "Rainway.exe"
                 || process.name() == "CefSharp.BrowserSubprocess.exe"
                 || process.name() == "Radar.exe"
                 || process.name() == "LaunchRainway.exe"
                 || process.name() == "RainwayInstaller.exe"
+                || process.name() == "bootstrapper.exe" && process.id() != current_process.id()
             {
                 if process.kill() {
                     log::info!("Rainway process {} terminated", process.name());

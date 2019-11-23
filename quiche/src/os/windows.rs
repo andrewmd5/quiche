@@ -3,25 +3,18 @@ use crate::os::process::get_current_process;
 use regex::Regex;
 use std::env::var_os;
 use std::path::PathBuf;
-use std::{env, mem, ptr};
+use std::{mem, ptr};
 use winapi::shared::minwindef::{DWORD, LPVOID};
 use winapi::um::processthreadsapi::{GetCurrentProcess, OpenProcessToken};
 use winapi::um::securitybaseapi::{
     AllocateAndInitializeSid, CheckTokenMembership, FreeSid, GetTokenInformation,
 };
-use winapi::um::winnt::DOMAIN_ALIAS_RID_ADMINS;
-use winapi::um::winnt::KEY_READ;
-use winapi::um::winnt::KEY_WOW64_64KEY;
-use winapi::um::winnt::SECURITY_BUILTIN_DOMAIN_RID;
-use winapi::um::winnt::SECURITY_NT_AUTHORITY;
-use winapi::um::winnt::SID_IDENTIFIER_AUTHORITY;
-use winapi::um::winnt::{TokenElevation, HANDLE, PSID, TOKEN_ELEVATION, TOKEN_QUERY};
+use winapi::um::winnt::{TokenElevation, HANDLE, TOKEN_ELEVATION, TOKEN_QUERY, SID_IDENTIFIER_AUTHORITY, SECURITY_NT_AUTHORITY, SECURITY_BUILTIN_DOMAIN_RID, KEY_WOW64_64KEY, KEY_READ. DOMAIN_ALIAS_RID_ADMINS};
 use winapi::um::winuser::{GetSystemMetrics, SM_REMOTESESSION};
 use winreg::enums::HKEY_LOCAL_MACHINE;
 use winreg::enums::KEY_ALL_ACCESS;
 use winreg::types::ToRegValue;
-use winreg::RegKey;
-use winreg::HKEY;
+use winreg::{HKEY, RegKey};
 /// dism.exe will return exit code 740 if it is launched
 /// from a non-elevated process.
 static ELEVATION_REQUIRED: i32 = 740;
