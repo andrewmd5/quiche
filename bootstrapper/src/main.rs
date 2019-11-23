@@ -264,7 +264,7 @@ fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
     };
 
     // Separate file config so we can include colors in the terminal
-    let file_config = fern::Dispatch::new()
+    /*let file_config = fern::Dispatch::new()
         .format(|out, message, record| {
             add_breadcrumb(message.to_string(), record.level());
             out.finish(format_args!(
@@ -274,7 +274,7 @@ fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
                 message
             ))
         })
-        .chain(File::create(format!("{}.log", env!("CARGO_PKG_NAME")))?);
+        .chain(File::create(format!("{}.log", env!("CARGO_PKG_NAME")))?);*/
 
     let stdout_config = fern::Dispatch::new()
         .format(move |out, message, record| {
@@ -288,7 +288,7 @@ fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
         .chain(std::io::stdout());
 
     base_config
-        .chain(file_config)
+        //.chain(file_config)
         .chain(stdout_config)
         .apply()?;
 
