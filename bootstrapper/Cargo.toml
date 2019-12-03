@@ -25,6 +25,6 @@ web-view = { git = "https://github.com/RainwayApp/web-view.git" }
 quiche = { path = "../quiche" }
 rust-embed = "5.1.0"
 sentry = { version = "0.12.0", features = ["with_device_info", "with_panic", "with_rust_info", "with_backtrace"] } 
-winapi = { version = "0.3.8", features = ["winuser", "combaseapi", "objbase", "shellapi", "shellscalingapi"] }
+winapi = { version = "0.3.8", features = ["winuser", "combaseapi", "objbase", "shellapi"] }
 log = "0.4.8"
 fern = { version = "0.5.8", features = ["colored"] }

@@ -850,7 +850,7 @@ pub mod updater {
     /// Derives if Rainway is currently installed based on
     /// the list of installed applications for the current user.
     pub fn is_installed() -> Result<bool, BootstrapError> {
-        let uninstallers = get_uninstallers()?;
+        let uninstallers = get_uninstallers().unwrap_or(Vec::new());
         Ok(uninstallers
             .into_iter()
             .any(|u| u.key == env!("UNINSTALL_KEY")))
