@@ -94,12 +94,12 @@ pub fn check_system_compatibility() -> Result<(), BootstrapError> {
 
     if system_info.is_n_edition {
         log::warn!("Windows N detected.");
-        if needs_media_pack()? {
+        /*if needs_media_pack()? {
             log::error!("Windows Media Pack is not installed.");
             return Err(BootstrapError::NeedWindowsMediaPack(
                 system_info.product_name,
             ));
-        }
+        }*/
     }
 
     let dotnet = get_dotnet_framework_version();

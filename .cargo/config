@@ -2,3 +2,5 @@
 rustflags = ["-Ctarget-feature=+crt-static"]
 [target.i686-pc-windows-msvc]
 rustflags = ["-Ctarget-feature=+crt-static", "-Clink-arg=/NXCOMPAT", "-Clink-arg=/DYNAMICBASE", "-Clink-arg=/SAFESEH"]
+[build]
+target = "i686-pc-windows-msvc"
