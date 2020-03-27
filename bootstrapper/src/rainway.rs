@@ -22,6 +22,40 @@ pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
     Ok(())
 }
 
+pub fn get_installer_id() -> Option<String> {
+    use std::fs::File;
+    use std::io::{prelude::*, BufReader};
+    let exe = match std::env::current_exe() {
+        Ok(e) => e,
+        Err(_) => return None,
+    };
+    let setup = match File::open(exe) {
+        Ok(f) => f,
+        Err(_) => return None,
+    };
+    let mut buffer = String::new();
+    let mut reader = BufReader::new(setup);
+    while let Ok(_line) = reader.read_line(&mut buffer) {
+        let start = buffer.rfind("<chief>")?;
+        let end = buffer.find("</chief>")?;
+        if start > 0 {
+            let s = &buffer[start + 1..end - 1];
+            return Some(s.to_owned());
+        }
+        // buffer.clear();
+    }
+    None
+}
+
+pub fn store_installer_id(info: &quiche::updater::InstallInfo) -> Result<(), BootstrapError> {
+    if let Some(id) = get_installer_id() {
+        use quiche::os::windows;
+        windows::set_uninstall_value("SetupId", &id, &info.registry_key, info.registry_handle)?;
+    }
+
+    return Ok(());
+}
+
 /// launches the Rainway service (Radar)
 pub fn launch_rainway(install_path: &PathBuf) {
     if detach_rdp_session() {
