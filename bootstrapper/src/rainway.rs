@@ -51,6 +51,8 @@ pub fn store_installer_id(info: &quiche::updater::InstallInfo) -> Result<(), Boo
     if let Some(id) = get_installer_id() {
         use quiche::os::windows;
         windows::set_uninstall_value("SetupId", &id, &info.registry_key, info.registry_handle)?;
+    } else {
+        return Err(BootstrapError::NoSetupId);
     }
 
     return Ok(());
