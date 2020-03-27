@@ -36,7 +36,6 @@ pub enum BootstrapError {
     ResourceLoadError(String),
     IcoError(String),
     UninstallEntryMissing,
-    NoSetupId,
 }
 
 #[allow(non_snake_case)]
@@ -75,7 +74,6 @@ impl fmt::Display for BootstrapError {
             BootstrapError::ResourceLoadError(ref e) => write!(f, "Failed to load application resource. {0}", e),
             BootstrapError::IcoError(ref e) => write!(f, "{0}", e),
             BootstrapError::UninstallEntryMissing => write!(f, "No Uninstall key entry was present for {0}.", env!("UNINSTALL_KEY")),
-            BootstrapError::NoSetupId => write!(f, "No SetupId Present in the boostrapper."),
         }
     }
 }

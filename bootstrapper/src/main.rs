@@ -215,10 +215,7 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
                 launch_and_close(webview, update);
             } else {
                 // Now that we are installed we want to store the install id in the registry
-                match rainway::store_installer_id(&update.install_info) {
-                    Err(e) => log::warn!("Unable to store setup id {}!", e),
-                    Ok(()) => log::info!("Stored setupid!"),
-                }
+                rainway::store_installer_id(&update.install_info);
                 std::process::exit(0);
             }
         }
