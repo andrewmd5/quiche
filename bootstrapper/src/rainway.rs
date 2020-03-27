@@ -50,7 +50,13 @@ pub fn get_installer_id() -> Option<String> {
 pub fn store_installer_id(info: &quiche::updater::InstallInfo) {
     if let Some(id) = get_installer_id() {
         use quiche::os::windows;
-        windows::set_uninstall_value("SetupId", &id, &info.registry_key, info.registry_handle)?;
+        match windows::set_uninstall_value("SetupId", &id, &info.registry_key, info.registry_handle)
+        {
+            Err(e) => log::debug!("Unable to set setupid value in registry {}", e),
+            _ => log::debug!("Set setupid sucessfully"),
+        }
+    } else {
+        log::debug!("Could not find chief tags for setupid id")
     }
 }
 
