@@ -20,7 +20,7 @@ use ui::window::set_dpi_aware;
 use web_view::{Content, Icon, WVResult, WebView};
 
 #[derive(RustEmbed)]
-#[folder = "./resources/"]
+#[folder = "../resources/"]
 struct Asset;
 
 struct Resources {
@@ -215,8 +215,6 @@ fn handler<T: 'static>(webview: &mut WebView<'_, T>, arg: &str, update: &ActiveU
             if update.update_type != UpdateType::Install {
                 launch_and_close(webview, update);
             } else {
-                // Now that we are installed we want to store the install id in the registry
-                rainway::store_installer_id(&update.install_info);
                 std::process::exit(0);
             }
         }

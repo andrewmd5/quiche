@@ -291,7 +291,9 @@ pub mod updater {
     use crate::io::hash::sha_256;
     use crate::io::zip::unzip;
     use crate::net::http::{download_file, download_toml};
-    use crate::os::files::{unblock_file, unblock_path, take_ownership_of_dir, grant_full_permissions};
+    use crate::os::files::{
+        grant_full_permissions, take_ownership_of_dir, unblock_file, unblock_path,
+    };
     use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle};
     use serde::{Deserialize, Serialize};
     use std::fs::{create_dir_all, remove_dir_all};
@@ -798,7 +800,6 @@ pub mod updater {
             log::info!("failed to unblock the install path");
         }
 
-
         if take_ownership_of_dir(&update.install_info.path) {
             log::info!("took ownership of the install path.");
         } else {
@@ -811,7 +812,6 @@ pub mod updater {
             log::info!("unable to grant full permissions to the install path.");
         }
 
-        
         log::info!("update went off without a hitch.");
 
         update.update_display_version();
@@ -844,6 +844,9 @@ pub mod updater {
         } else {
             log::warn!("No output");
         }
+
+        store_installer_id(update.install_info);
+
         results
     }
 
@@ -854,5 +857,72 @@ pub mod updater {
         Ok(uninstallers
             .into_iter()
             .any(|u| u.key == env!("UNINSTALL_KEY")))
+    }
+
+    fn get_installer_id() -> Option<String> {
+        use std::fs::File;
+        use std::io::{prelude::*, BufReader};
+        let exe = match std::env::current_exe() {
+            Ok(e) => e,
+            Err(_) => return None,
+        };
+
+        let setup = match File::open(exe) {
+            Ok(f) => f,
+            Err(_) => return None,
+        };
+
+        fn find2(start: usize, haystack: &[u8], needle: &[u8]) -> Option<usize> {
+            (&haystack[start..])
+                .windows(needle.len())
+                .position(|window| window == needle)
+        }
+
+        let chief_bytes = &"<chief>".to_owned().into_bytes();
+        let end_chief_bytes = &"</chief>".to_owned().into_bytes();
+
+        let mut buffer = Vec::new();
+        let mut reader = BufReader::new(setup);
+        if let Ok(size) = reader.read_to_end(&mut buffer) {
+            let mut cur = 0 as usize;
+            while cur < buffer.len() {
+                let start = find2(cur, &buffer, chief_bytes);
+                let end = find2(cur, &buffer, end_chief_bytes);
+
+                match (start, end) {
+                    (Some(start), Some(end)) => {
+                        let start = start + cur;
+                        let end = end + cur;
+                        if end > start && end - start > chief_bytes.len() {
+                            let s = &buffer[start + chief_bytes.len()..end];
+                            if let Ok(s) = String::from_utf8(s.to_vec()) {
+                                return Some(s);
+                            }
+
+                            return None;
+                        } else {
+                            cur = end + 2;
+                            continue;
+                        }
+                    }
+
+                    _ => {
+                        return None;
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn store_installer_id(info: InstallInfo) {
+        if let Some(id) = get_installer_id() {
+            match set_uninstall_value("SetupId", &id, &info.registry_key, info.registry_handle) {
+                Err(e) => log::debug!("Unable to set setupid value in registry {}", e),
+                _ => log::debug!("Set setupid sucessfully"),
+            }
+        } else {
+            log::debug!("Could not find chief tags for setupid id")
+        }
     }
 }
