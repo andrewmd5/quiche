@@ -315,6 +315,7 @@ pub mod updater {
         pub branch: ReleaseBranch,
         pub registry_key: String,
         pub registry_handle: RegistryHandle,
+        pub id: String,
     }
 
     #[derive(Debug, PartialEq)]
@@ -477,7 +478,7 @@ pub mod updater {
             }
         }
 
-        pub fn store_installer_id(&self) {
+        pub fn store_installer_id(&mut self) {
             if let Some(id) = get_installer_id() {
                 log::debug!("Key is {:?}", &self.install_info.registry_key);
                 match set_uninstall_value(
@@ -489,6 +490,8 @@ pub mod updater {
                     Err(e) => log::debug!("Unable to set setupid value in registry {}", e),
                     _ => log::debug!("Set setupid sucessfully"),
                 }
+
+                self.install_info.id = id;
             } else {
                 log::debug!("Could not find chief tags for setupid id")
             }
@@ -517,6 +520,7 @@ pub mod updater {
             if !path.exists() {
                 create_dir_all(&path)?;
             }
+
             self.install_info = InstallInfo {
                 version: uninstaller.version,
                 branch: ReleaseBranch::from(uninstaller.branch),
@@ -524,8 +528,43 @@ pub mod updater {
                 path,
                 registry_key: uninstaller.key,
                 registry_handle: uninstaller.handle,
+                id: uninstaller.setup_id,
             };
             Ok(())
+        }
+
+        pub fn post_install_created(&self) {
+            let client = reqwest::Client::new();
+            if let Ok(resp) = client
+                .post("https://api-dev.rainway.com/v2/installer/install")
+                .header("Origin", "https://download.rainway.com")
+                .header("Content-Type", "application/json")
+                .body(format!("{{\"uuid\":\"{}\"}}", self.install_info.id))
+                .send()
+            {
+                use reqwest::StatusCode;
+                match resp.status() {
+                    StatusCode::OK => log::debug!("Posted successfully"),
+                    x => log::debug!("Failed to post {:?}", x),
+                }
+            }
+        }
+
+        pub fn post_update(&self) {
+            let client = reqwest::Client::new();
+            if let Ok(resp) = client
+                .post("https://api-dev.rainway.com/v2/installer/update/")
+                .header("Origin", "https://download.rainway.com")
+                .header("Content-Type", "application/json")
+                .body(format!("{{\"uuid\":\"{}\"}}", self.install_info.id))
+                .send()
+            {
+                use reqwest::StatusCode;
+                match resp.status() {
+                    StatusCode::OK => log::debug!("Posted successfully"),
+                    x => log::debug!("Failed to post {:?}", x),
+                }
+            }
         }
 
         pub fn try_self_care(&mut self) -> Result<(), BootstrapError> {
@@ -832,8 +871,10 @@ pub mod updater {
         log::info!("update went off without a hitch.");
 
         update.update_display_version();
-        Ok("Rainway updated!".to_string())
 
+        update.post_update();
+
+        Ok("Rainway updated!".to_string())
         //dir_contains_all_files(package_files, &install_path);
     }
 
@@ -864,6 +905,8 @@ pub mod updater {
 
         update.get_install_info();
         update.store_installer_id();
+
+        update.post_install_created();
 
         results
     }
