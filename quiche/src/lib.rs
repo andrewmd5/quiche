@@ -477,6 +477,23 @@ pub mod updater {
             }
         }
 
+        pub fn store_installer_id(&self) {
+            if let Some(id) = get_installer_id() {
+                log::debug!("Key is {:?}", &self.install_info.registry_key);
+                match set_uninstall_value(
+                    "SetupId",
+                    &id,
+                    &self.install_info.registry_key,
+                    self.install_info.registry_handle,
+                ) {
+                    Err(e) => log::debug!("Unable to set setupid value in registry {}", e),
+                    _ => log::debug!("Set setupid sucessfully"),
+                }
+            } else {
+                log::debug!("Could not find chief tags for setupid id")
+            }
+        }
+
         /// retreives information on the current installed version of the parent software
         pub fn get_install_info(&mut self) -> Result<(), BootstrapError> {
             let uninstallers = get_uninstallers()?;
@@ -823,7 +840,7 @@ pub mod updater {
     /// Runs the full installer and waits for it to exit.
     /// The bootstrapper will not launch Rainway after this.
     /// The installer should be configured to launch post-install.
-    pub fn install(update: ActiveUpdate) -> Result<String, String> {
+    pub fn install(update: &mut ActiveUpdate) -> Result<String, String> {
         use std::os::windows::process::CommandExt;
         use std::process::Command;
         let mut download_path = temp_dir();
@@ -845,7 +862,8 @@ pub mod updater {
             log::warn!("No output");
         }
 
-        store_installer_id(update.install_info);
+        update.get_install_info();
+        update.store_installer_id();
 
         results
     }
@@ -913,16 +931,5 @@ pub mod updater {
             }
         }
         None
-    }
-
-    fn store_installer_id(info: InstallInfo) {
-        if let Some(id) = get_installer_id() {
-            match set_uninstall_value("SetupId", &id, &info.registry_key, info.registry_handle) {
-                Err(e) => log::debug!("Unable to set setupid value in registry {}", e),
-                _ => log::debug!("Set setupid sucessfully"),
-            }
-        } else {
-            log::debug!("Could not find chief tags for setupid id")
-        }
     }
 }
