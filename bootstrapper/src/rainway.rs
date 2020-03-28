@@ -29,20 +29,52 @@ pub fn get_installer_id() -> Option<String> {
         Ok(e) => e,
         Err(_) => return None,
     };
+
     let setup = match File::open(exe) {
         Ok(f) => f,
         Err(_) => return None,
     };
-    let mut buffer = String::new();
+
+    fn find2(start: usize, haystack: &Vec<u8>, needle: &Vec<u8>) -> Option<usize> {
+        let n = needle.as_slice();
+        (&haystack[start..])
+            .windows(needle.len())
+            .position(|window| window == n)
+    }
+
+    let chief_bytes = &"<chief>".to_owned().into_bytes();
+    let end_chief_bytes = &"</chief>".to_owned().into_bytes();
+
+    let mut buffer = Vec::new();
     let mut reader = BufReader::new(setup);
-    while let Ok(_line) = reader.read_line(&mut buffer) {
-        let start = buffer.rfind("<chief>")?;
-        let end = buffer.find("</chief>")?;
-        if start > 0 {
-            let s = &buffer[start + 1..end - 1];
-            return Some(s.to_owned());
+    if let size = reader.read_to_end(&mut buffer) {
+        let mut cur = 0 as usize;
+        while cur < buffer.len() {
+            let start = find2(cur, &buffer, chief_bytes);
+            let end = find2(cur, &buffer, end_chief_bytes);
+
+            match (start, end) {
+                (Some(start), Some(end)) => {
+                    let start = start + cur;
+                    let end = end + cur;
+                    if end > start && end - start > chief_bytes.len() {
+                        let s = &buffer[start + chief_bytes.len()..end];
+                        if let Ok(s) = String::from_utf8(s.to_vec()) {
+                            return Some(s);
+                        }
+
+                        return None;
+                    } else {
+                        cur = end + 2;
+                        continue;
+                    }
+                }
+
+                _ => {
+                    return None;
+                }
+            }
         }
-        // buffer.clear();
     }
     None
 }
