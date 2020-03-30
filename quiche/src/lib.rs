@@ -536,8 +536,8 @@ pub mod updater {
         pub fn post_install_created(&self) {
             let client = reqwest::Client::new();
             if let Ok(resp) = client
-                .post("https://api-dev.rainway.com/v2/installer/install")
-                .header("Origin", "https://download.rainway.com")
+                .post(env!("INSTALL_ENDPOINT"))
+                .header("Origin", env!("API_ORIGIN"))
                 .header("Content-Type", "application/json")
                 .body(format!("{{\"uuid\":\"{}\"}}", self.install_info.id))
                 .send()
@@ -553,8 +553,8 @@ pub mod updater {
         pub fn post_update(&self) {
             let client = reqwest::Client::new();
             if let Ok(resp) = client
-                .post("https://api-dev.rainway.com/v2/installer/update/")
-                .header("Origin", "https://download.rainway.com")
+                .post(env!("UPDATE_ENDPOINT"))
+                .header("Origin", env!("API_ORIGIN"))
                 .header("Content-Type", "application/json")
                 .body(format!("{{\"uuid\":\"{}\"}}", self.install_info.id))
                 .send()

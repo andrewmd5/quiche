@@ -9,6 +9,9 @@ build = "build.rs"
 base_release_url = "https://releases.rainway.com/quiche"
 release_path = "/Releases.toml"
 uninstall_key = "{E312ACD2-6504-4A9E-A968-B12F0242385D}" # our AI product code
+install_endpoint = "https://api-dev.rainway.com/v2/installer/install"
+update_endpoint = "https://api-dev.rainway.com/v2/installer/update"
+api_origin = "https://download.rainway.com"
 
 [dependencies]
 walkdir = "2"

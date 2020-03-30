@@ -36,4 +36,16 @@ fn main() {
         "cargo:rustc-env=RELEASE_PATH={}",
         find_cargo_field("release_path")
     );
+    println!(
+        "cargo:rustc-env=INSTALL_ENDPOINT={}",
+        find_cargo_field("install_endpoint")
+    );
+    println!(
+        "cargo:rustc-env=UPDATE_ENDPOINT={}",
+        find_cargo_field("update_endpoint")
+    );
+    println!(
+        "cargo:rustc-env=API_ORIGIN={}",
+        find_cargo_field("api_origin")
+    );
 }
