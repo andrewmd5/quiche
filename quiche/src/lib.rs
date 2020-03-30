@@ -535,11 +535,15 @@ pub mod updater {
 
         pub fn post_install_created(&self) {
             let client = reqwest::Client::new();
+
             if let Ok(resp) = client
                 .post(env!("INSTALL_ENDPOINT"))
                 .header("Origin", env!("API_ORIGIN"))
                 .header("Content-Type", "application/json")
-                .body(format!("{{\"uuid\":\"{}\"}}", self.install_info.id))
+                .body(format!(
+                    r#"{{"uuid":"{}", "version": "{}"}}"#,
+                    self.install_info.id, self.install_info.version,
+                ))
                 .send()
             {
                 use reqwest::StatusCode;
@@ -556,7 +560,10 @@ pub mod updater {
                 .post(env!("UPDATE_ENDPOINT"))
                 .header("Origin", env!("API_ORIGIN"))
                 .header("Content-Type", "application/json")
-                .body(format!("{{\"uuid\":\"{}\"}}", self.install_info.id))
+                .body(format!(
+                    r#"{{"uuid":"{}", "version": "{}"}}"#,
+                    self.install_info.id, self.install_info.version
+                ))
                 .send()
             {
                 use reqwest::StatusCode;
@@ -904,9 +911,15 @@ pub mod updater {
         }
 
         update.get_install_info();
-        update.store_installer_id();
 
-        update.post_install_created();
+        if update.install_info.id == "" {
+            // New computer and new install so store the install of this installer specifically
+            update.store_installer_id();
+            update.post_install_created();
+        } else {
+            // There was a residual setup_id from the last install...
+            // TODO reactivate!!!!
+        }
 
         results
     }
@@ -944,6 +957,7 @@ pub mod updater {
 
         let mut buffer = Vec::new();
         let mut reader = BufReader::new(setup);
+
         if let Ok(size) = reader.read_to_end(&mut buffer) {
             let mut cur = 0 as usize;
             while cur < buffer.len() {
