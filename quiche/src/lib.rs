@@ -548,7 +548,7 @@ pub mod updater {
             {
                 use reqwest::StatusCode;
                 match resp.status() {
-                    StatusCode::OK => log::debug!("Posted successfully"),
+                    StatusCode::OK => log::debug!("Posted install successfully"),
                     x => log::debug!("Failed to post {:?}", x),
                 }
             }
@@ -918,7 +918,22 @@ pub mod updater {
             update.post_install_created();
         } else {
             // There was a residual setup_id from the last install...
-            // TODO reactivate!!!!
+            if let Ok(resp) = reqwest::Client::new()
+                .post(env!("ACTIVATE_ENDPOINT"))
+                .header("Origin", env!("API_ORIGIN"))
+                .header("Content-Type", "application/json")
+                .body(format!(
+                    r#"{{"uuid":"{}", "version": "{}"}}"#,
+                    update.install_info.id, update.install_info.version,
+                ))
+                .send()
+            {
+                use reqwest::StatusCode;
+                match resp.status() {
+                    StatusCode::OK => log::debug!("Posted activate successfully"),
+                    x => log::debug!("Failed to post {:?}", x),
+                }
+            }
         }
 
         results
