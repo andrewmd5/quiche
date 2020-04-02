@@ -11,7 +11,6 @@ where
     T: DeserializeOwned,
 {
     use tokio::runtime::Runtime;
-
     let mut runtime = match Runtime::new() {
         Ok(rt) => rt,
         Err(e) => return Err(BootstrapError::from(e)),
@@ -55,6 +54,7 @@ where
     F: Fn(u64, u64) + Send + Sync + 'static,
 {
     let client = match Client::builder()
+        .no_trust_dns()
         .connect_timeout(Duration::from_secs(30))
         .build()
     {
