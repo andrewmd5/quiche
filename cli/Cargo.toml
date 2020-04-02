@@ -10,4 +10,4 @@ edition = "2018"
 quiche = { path = "../quiche" }
 clap = "2.33.0"
 log = "0.4.8"
-fern = { version = "0.5.8", features = ["colored"] }
+fern = { version = "0.6.0", features = ["colored"] }
