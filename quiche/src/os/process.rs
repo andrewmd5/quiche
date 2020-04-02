@@ -1,6 +1,7 @@
 use crate::os::guid::Guid;
 use std::io::{Error, ErrorKind};
-use std::mem;
+use std::mem::{MaybeUninit, size_of_val};
+
 use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
 use winapi::shared::minwindef::DWORD;
@@ -281,9 +282,9 @@ fn snapshot() -> Result<Vec<PROCESSENTRY32W>, u32> {
             return Err(GetLastError());
         }
 
-        let mut entry: PROCESSENTRY32W = mem::uninitialized();
+        let mut entry: PROCESSENTRY32W = MaybeUninit::uninit().assume_init();
         // We must set the size first or this will not work.
-        entry.dwSize = mem::size_of_val(&entry) as _;
+        entry.dwSize = size_of_val(&entry) as _;
 
         // Get First Process.
         let mut result = Process32FirstW(snapshot, &mut entry);

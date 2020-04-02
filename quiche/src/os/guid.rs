@@ -1,4 +1,4 @@
-use std::mem;
+use std::mem::{MaybeUninit};
 use winapi::shared::guiddef::GUID;
 use winapi::shared::winerror::{NOERROR, S_OK};
 use winapi::um::combaseapi::{CLSIDFromString, CoCreateGuid, StringFromGUID2};
@@ -38,7 +38,7 @@ impl Guid {
     /// |    `P`    |`(00000000-0000-0000-0000-000000000000)`|
     pub fn format(&self, specifier: &str) -> Option<String> {
         use std::os::raw::c_int;
-        let mut s: [u16; GUID_STRING_CHARACTERS + 1] = unsafe { mem::uninitialized() };
+        let mut s: [u16; GUID_STRING_CHARACTERS + 1] = unsafe { MaybeUninit::uninit().assume_init() };
         let len = unsafe {
             StringFromGUID2(
                 &(self.clsid).Data1 as *const _ as *mut _,
@@ -76,7 +76,7 @@ impl Guid {
         if guid_str.len() < GUID_N_CHARACTERS {
             return None;
         }
-        let mut clsid = unsafe { mem::uninitialized() };
+        let mut clsid = unsafe { MaybeUninit::uninit().assume_init() };
 
         // https://i.imgur.com/JA1y4DR.png
         let formatted = if !guid_str.starts_with('{') && !guid_str.contains('-') {
