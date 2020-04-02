@@ -35,7 +35,7 @@ pub enum BootstrapError {
     WebView(String),
     ResourceLoadError(String),
     IcoError(String),
-    UninstallEntryMissing,
+    UninstallEntryMissing
 }
 
 #[allow(non_snake_case)]

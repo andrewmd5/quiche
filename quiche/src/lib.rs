@@ -291,17 +291,16 @@ pub mod updater {
     use crate::io::hash::sha_256;
     use crate::io::zip::unzip;
     use crate::net::http::{download_file, download_toml};
-    use crate::os::files::{unblock_file, unblock_path, take_ownership_of_dir, grant_full_permissions};
+    use crate::os::files::{
+        grant_full_permissions, take_ownership_of_dir, unblock_file, unblock_path,
+    };
     use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle};
     use serde::{Deserialize, Serialize};
     use std::fs::{create_dir_all, remove_dir_all};
 
     use std::{
         env::{temp_dir, var},
-        path::{Path, PathBuf},
-        sync::{Arc, RwLock},
-        thread,
-        time::Duration,
+        path::{Path, PathBuf}
     };
 
     /// a struct that represents information found in the uninstall key registry entry
@@ -332,32 +331,8 @@ pub mod updater {
         Stable,
         Beta,
         Nightly,
-    }
-
-    /// The various states an update can be in.
-    #[derive(Debug, PartialEq, Eq)]
-    pub enum UpdateState {
-        /// None means the update/installation has not started.
-        None,
-        /// Failed signifies that the update failed,
-        /// usually because the download encountered an issue.
-        /// This can come in the form of network errors
-        /// or the wrong has returning
-        Failed,
-        /// If we are rolling back the update failed to apply
-        /// the new files to disk.
-        RollingBack,
-        /// The update package or installer is downloading.
-        Downloading,
-        /// The update is being validated by hashing the downloaded
-        /// package or installer to check if it matches the manifest.
-        Validating,
-        /// The update is being written to disk.
-        Applying,
-        /// The update was applied successfully.
-        Done,
-    }
-
+    } 
+    
     #[derive(Default, Clone)]
     pub struct ActiveUpdate {
         /// identifies if the current update is a full install or a patch.
@@ -527,14 +502,6 @@ pub mod updater {
         }
     }
 
-    #[derive(Default, Copy, Clone)]
-    pub struct UpdateDownloadProgress {
-        pub state: UpdateState,
-        pub total_bytes: u64,
-        pub downloaded_bytes: u64,
-        pub faulted: bool,
-    }
-
     #[derive(Serialize, Deserialize, Default)]
     pub struct Branch {
         /// The version of the active branch.
@@ -633,41 +600,26 @@ pub mod updater {
     where
         F: Fn(u64, u64) + Send + Sync + 'static,
     {
-        let download_progress = UpdateDownloadProgress::default();
-        let arc = Arc::new(RwLock::new(download_progress));
-        let local_arc = arc.clone();
-        let child = thread::spawn(move || loop {
-            {
-                let reader_lock = arc.clone();
-                let reader = reader_lock.read().unwrap();
-                if reader.faulted {
-                    drop(reader);
-                    break;
-                }
-                if reader.state == UpdateState::Downloading
-                    && reader.total_bytes == reader.downloaded_bytes
-                {
-                    drop(reader);
-                    break;
-                }
-                callback(reader.total_bytes, reader.downloaded_bytes);
-                drop(reader);
+        use tokio::runtime::Runtime;
+        let mut runtime = match Runtime::new() {
+            Ok(rt) => rt,
+            Err(e) => return Err(format!("{}", BootstrapError::from(e))),
+        };
+        let results = runtime.block_on(async {
+            log::info!("download background thread started");
+            let mut download_path = temp_dir();
+            download_path.push(update.get_temp_name());
+            let results = download_file(callback, &update.get_url(), &download_path)
+                .await
+                .map_err(|err| format!("{}", err))
+                .map(|output| format!("{}", output));
+            if results.is_ok() {
+                log::info!("unblocking {}", &download_path.display());
+                unblock_file(download_path);
             }
-            thread::sleep(Duration::from_millis(16));
+            results
         });
-        log::info!("download background thread started");
-        let mut download_path = temp_dir();
-        download_path.push(update.get_temp_name());
-        let results = download_file(local_arc, &update.get_url(), &download_path)
-            .map_err(|err| format!("{}", err))
-            .map(|output| format!("{}", output));
-
-        if results.is_ok() {
-            log::info!("unblocking {}", &download_path.display());
-            unblock_file(download_path);
-        }
-        let _res = child.join();
-        log::info!("download background thread finished.");
+        drop(runtime);
         results
     }
 
@@ -798,7 +750,6 @@ pub mod updater {
             log::info!("failed to unblock the install path");
         }
 
-
         if take_ownership_of_dir(&update.install_info.path) {
             log::info!("took ownership of the install path.");
         } else {
@@ -811,7 +762,6 @@ pub mod updater {
             log::info!("unable to grant full permissions to the install path.");
         }
 
-        
         log::info!("update went off without a hitch.");
 
         update.update_display_version();
