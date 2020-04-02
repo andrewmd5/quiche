@@ -1,5 +1,5 @@
 use crate::io::ico::IcoError;
-use crate::updater::{ReleaseBranch, UpdateState, UpdateType};
+use crate::updater::{ReleaseBranch, UpdateType};
 use std::fmt;
 
 #[derive(Debug)]
@@ -125,23 +125,12 @@ impl From<std::str::Utf8Error> for BootstrapError {
     }
 }
 
-impl Default for UpdateState {
-    fn default() -> UpdateState {
-        UpdateState::None
-    }
-}
-
 impl Default for UpdateType {
     fn default() -> UpdateType {
         UpdateType::Install
     }
 }
 
-impl fmt::Display for UpdateState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
 
 impl fmt::Display for UpdateType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -152,14 +141,6 @@ impl Copy for UpdateType {}
 
 impl Clone for UpdateType {
     fn clone(&self) -> UpdateType {
-        *self
-    }
-}
-
-impl Copy for UpdateState {}
-
-impl Clone for UpdateState {
-    fn clone(&self) -> UpdateState {
         *self
     }
 }
