@@ -1,5 +1,5 @@
 use crate::io::ico::IcoError;
-use crate::updater::{ReleaseBranch, UpdateState, UpdateType};
+use crate::updater::{ReleaseBranch, UpdateType};
 use std::fmt;
 
 #[derive(Debug)]
@@ -30,12 +30,12 @@ pub enum BootstrapError {
     RemoteFileMissing(String),
     RemoteFileEmpty(String),
     InstallationFailed(String),
-    RequestError(reqwest::Error),
+    RequestError(hyper::Error),
     IOError(std::io::Error),
     WebView(String),
     ResourceLoadError(String),
     IcoError(String),
-    UninstallEntryMissing,
+    UninstallEntryMissing
 }
 
 #[allow(non_snake_case)]
@@ -101,11 +101,12 @@ impl Default for ReleaseBranch {
     }
 }
 
-impl From<reqwest::Error> for BootstrapError {
-    fn from(error: reqwest::Error) -> Self {
+impl From<hyper::Error> for BootstrapError {
+    fn from(error: hyper::Error) -> Self {
         BootstrapError::RequestError(error)
     }
 }
+
 
 impl From<std::io::Error> for BootstrapError {
     fn from(error: std::io::Error) -> Self {
@@ -125,23 +126,12 @@ impl From<std::str::Utf8Error> for BootstrapError {
     }
 }
 
-impl Default for UpdateState {
-    fn default() -> UpdateState {
-        UpdateState::None
-    }
-}
-
 impl Default for UpdateType {
     fn default() -> UpdateType {
         UpdateType::Install
     }
 }
 
-impl fmt::Display for UpdateState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
 
 impl fmt::Display for UpdateType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -152,14 +142,6 @@ impl Copy for UpdateType {}
 
 impl Clone for UpdateType {
     fn clone(&self) -> UpdateType {
-        *self
-    }
-}
-
-impl Copy for UpdateState {}
-
-impl Clone for UpdateState {
-    fn clone(&self) -> UpdateState {
         *self
     }
 }

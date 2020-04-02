@@ -3,7 +3,7 @@ use quiche::etc::constants::BootstrapError;
 use quiche::os::process::get_processes;
 use quiche::os::service::{install_service, service_exist, start_service, WindowsService};
 use quiche::os::windows::{
-    detach_rdp_session, get_dotnet_framework_version, get_system_info, needs_media_pack,
+    detach_rdp_session, get_dotnet_framework_version, get_system_info,
 };
 use std::path::PathBuf;
 use std::process;

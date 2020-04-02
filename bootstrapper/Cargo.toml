@@ -23,9 +23,9 @@ winres = "0.1"
 #web-view = { path = "E:/Dev/Rainway/web-view" }
 web-view = { git = "https://github.com/RainwayApp/web-view.git" }
 quiche = { path = "../quiche" }
-rust-embed = "5.5.1"
-sentry = { version = "0.12.0", features = ["with_device_info", "with_panic", "with_rust_info", "with_backtrace"] } 
-winapi = { version = "0.3.8", features = ["winuser", "combaseapi", "objbase", "shellapi", "shellscalingapi"] }
+rust-embed  = { version = "5.5.1", features = ["interpolate-folder-path"] }
+sentry = { version = "0.18.0", features = ["with_device_info", "with_panic", "with_rust_info", "with_backtrace"] } 
+winapi = { version = "0.3.8", features = ["winuser", "combaseapi", "objbase", "shellapi"] }
 log = "0.4.8"
-fern = { version = "0.5.8", features = ["colored"] }
+fern = { version = "0.6.0", features = ["colored"] }
 quote = "=1.0.1"

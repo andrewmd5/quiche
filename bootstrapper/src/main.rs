@@ -18,9 +18,8 @@ use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
 use ui::window::set_dpi_aware;
 use web_view::{Content, Icon, WVResult, WebView};
-
 #[derive(RustEmbed)]
-#[folder = "../resources/"]
+#[folder = "$CARGO_MANIFEST_DIR\\..\\resources"]
 struct Asset;
 
 struct Resources {
