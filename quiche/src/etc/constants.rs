@@ -30,7 +30,7 @@ pub enum BootstrapError {
     RemoteFileMissing(String),
     RemoteFileEmpty(String),
     InstallationFailed(String),
-    RequestError(reqwest::Error),
+    RequestError(hyper::Error),
     IOError(std::io::Error),
     WebView(String),
     ResourceLoadError(String),
@@ -101,11 +101,12 @@ impl Default for ReleaseBranch {
     }
 }
 
-impl From<reqwest::Error> for BootstrapError {
-    fn from(error: reqwest::Error) -> Self {
+impl From<hyper::Error> for BootstrapError {
+    fn from(error: hyper::Error) -> Self {
         BootstrapError::RequestError(error)
     }
 }
+
 
 impl From<std::io::Error> for BootstrapError {
     fn from(error: std::io::Error) -> Self {

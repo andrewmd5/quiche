@@ -1,8 +1,10 @@
 use crate::etc::constants::BootstrapError;
-use reqwest::{header, Client};
+use hyper::body::HttpBody as _;
+use hyper::Client;
+use hyper::{Body, Request};
+use hyper_tls::HttpsConnector;
 use serde::de::DeserializeOwned;
 use std::path::PathBuf;
-use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 
 /// Downloads a remote TOML string and deseralizes it into a provided <T> generic.
@@ -16,7 +18,16 @@ where
         Err(e) => return Err(BootstrapError::from(e)),
     };
     let results = runtime.block_on(async {
-        let response = match reqwest::get(url).await {
+        let mut https = HttpsConnector::new();
+        https.https_only(true);
+        let client = Client::builder().build::<_, hyper::Body>(https);
+
+        let request = match Request::get(url).body(Body::empty()) {
+            Ok(b) => b,
+            Err(e) => return Err(BootstrapError::HttpFailed(e.to_string())),
+        };
+
+        let mut response = match client.request(request).await {
             Ok(r) => r,
             Err(e) => return Err(BootstrapError::HttpFailed(e.to_string())),
         };
@@ -27,8 +38,12 @@ where
                 url.to_string()
             )));
         }
-        let toml = response.text().await?;
-        match toml::from_str(&toml) {
+
+        let mut buffer: Vec<u8> = Vec::new();
+        while let Some(chunk) = response.body_mut().data().await {
+            buffer.append(&mut chunk?.to_vec());
+        }
+        match toml::from_slice(&buffer) {
             Err(e) => {
                 return Err(BootstrapError::TomlParseFailure(
                     url.to_string(),
@@ -53,16 +68,16 @@ pub async fn download_file<F>(
 where
     F: Fn(u64, u64) + Send + Sync + 'static,
 {
-    let client = match Client::builder()
-        .no_trust_dns()
-        .connect_timeout(Duration::from_secs(30))
-        .build()
-    {
-        Ok(c) => c,
+    let mut https = HttpsConnector::new();
+    https.https_only(true);
+    let client = Client::builder().build::<_, hyper::Body>(https);
+
+    let head_request = match Request::head(url).body(Body::empty()) {
+        Ok(b) => b,
         Err(e) => return Err(BootstrapError::HttpFailed(e.to_string())),
     };
 
-    let head_response = match client.head(url).send().await {
+    let head_response = match client.request(head_request).await {
         Ok(r) => r,
         Err(e) => return Err(BootstrapError::HttpFailed(e.to_string())),
     };
@@ -74,7 +89,7 @@ where
 
     let total_size = head_response
         .headers()
-        .get(header::CONTENT_LENGTH)
+        .get(hyper::header::CONTENT_LENGTH)
         .and_then(|ct_len| ct_len.to_str().ok())
         .and_then(|ct_len| ct_len.parse().ok())
         .unwrap_or(0);
@@ -95,11 +110,15 @@ where
         Err(e) => return Err(BootstrapError::HttpFailed(e.to_string())),
     };
 
-    let request = client.get(url);
-    let mut response = match request.send().await {
+    let download_request = match Request::get(url).body(Body::empty()) {
+        Ok(b) => b,
+        Err(e) => return Err(BootstrapError::HttpFailed(e.to_string())),
+    };
+    let mut download_response = match client.request(download_request).await {
         Ok(g) => g,
         Err(e) => return Err(BootstrapError::HttpFailed(e.to_string())),
     };
+
     //now we're safe
     log::info!(
         "starting download of {} ({} bytes) to {}.",
@@ -109,11 +128,8 @@ where
     );
 
     let mut total_downloaded_bytes = 0;
-    while let Some(chunk) = response.chunk().await? {
-        let read_bytes = match temp_file.write(&chunk).await {
-            Ok(r) => r,
-            Err(e) => return Err(BootstrapError::from(e)),
-        };
+    while let Some(chunk) = download_response.body_mut().data().await {
+        let read_bytes = temp_file.write(&chunk?).await?;
         total_downloaded_bytes += read_bytes as u64;
         callback(total_size, total_downloaded_bytes);
     }
