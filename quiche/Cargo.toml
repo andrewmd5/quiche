@@ -1,6 +1,6 @@
 [package]
 name = "quiche"
-version = "1.0.0"
+version = "1.0.5"
 authors = ["Andrew Sampson <andrew@rainway.io>"]
 edition = "2018"
 build = "build.rs"
