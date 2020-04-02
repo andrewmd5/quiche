@@ -290,7 +290,7 @@ pub mod updater {
     };
     use crate::io::hash::sha_256;
     use crate::io::zip::unzip;
-    use crate::net::http::{download_file, download_toml};
+    use crate::net::http::{download_file, download_toml, post};
     use crate::os::files::{
         grant_full_permissions, take_ownership_of_dir, unblock_file, unblock_path,
     };
@@ -300,7 +300,7 @@ pub mod updater {
 
     use std::{
         env::{temp_dir, var},
-        path::{Path, PathBuf}
+        path::{Path, PathBuf},
     };
 
     /// a struct that represents information found in the uninstall key registry entry
@@ -332,8 +332,7 @@ pub mod updater {
         Stable,
         Beta,
         Nightly,
-    } 
-    
+    }
     #[derive(Default, Clone)]
     pub struct ActiveUpdate {
         /// identifies if the current update is a full install or a patch.
@@ -506,44 +505,68 @@ pub mod updater {
             Ok(())
         }
 
-        pub fn post_install_created(&self) {
-            let client = reqwest::Client::new();
+        pub fn post_headers() -> std::collections::HashMap<&'static str, &'static str> {
+            use std::collections::HashMap;
 
-            if let Ok(resp) = client
-                .post(env!("INSTALL_ENDPOINT"))
-                .header("Origin", env!("API_ORIGIN"))
-                .header("Content-Type", "application/json")
-                .body(format!(
+            // Headers that we want to send on post requests to the api
+
+            [
+                ("Origin", env!("API_ORIGIN")),
+                ("Content-Type", "application/json"),
+            ]
+            .iter()
+            .cloned()
+            .collect()
+        }
+
+        pub fn post_install_created(&self) {
+            match post(
+                env!("INSTALL_ENDPOINT"),
+                format!(
                     r#"{{"uuid":"{}", "version": "{}"}}"#,
                     self.install_info.id, self.install_info.version,
-                ))
-                .send()
-            {
-                use reqwest::StatusCode;
-                match resp.status() {
-                    StatusCode::OK => log::debug!("Posted install successfully"),
+                ),
+                Some(ActiveUpdate::post_headers()),
+            ) {
+                Ok(s) => match s {
+                    hyper::StatusCode::OK => log::debug!("Posted install successfully"),
                     x => log::debug!("Failed to post {:?}", x),
-                }
+                },
+                x => log::debug!("Failed to post {:?}", x),
             }
         }
 
         pub fn post_update(&self) {
-            let client = reqwest::Client::new();
-            if let Ok(resp) = client
-                .post(env!("UPDATE_ENDPOINT"))
-                .header("Origin", env!("API_ORIGIN"))
-                .header("Content-Type", "application/json")
-                .body(format!(
+            match post(
+                env!("UPDATE_ENDPOINT"),
+                format!(
                     r#"{{"uuid":"{}", "version": "{}"}}"#,
-                    self.install_info.id, self.install_info.version
-                ))
-                .send()
-            {
-                use reqwest::StatusCode;
-                match resp.status() {
-                    StatusCode::OK => log::debug!("Posted successfully"),
+                    self.install_info.id, self.install_info.version,
+                ),
+                Some(ActiveUpdate::post_headers()),
+            ) {
+                Ok(s) => match s {
+                    hyper::StatusCode::OK => log::debug!("Posted install successfully"),
                     x => log::debug!("Failed to post {:?}", x),
-                }
+                },
+                x => log::debug!("Failed to post {:?}", x),
+            }
+        }
+
+        pub fn post_activate(&self) {
+            match post(
+                env!("ACTIVATE_ENDPOINT"),
+                format!(
+                    r#"{{"uuid":"{}", "version": "{}"}}"#,
+                    self.install_info.id, self.install_info.version,
+                ),
+                Some(ActiveUpdate::post_headers()),
+            ) {
+                Ok(s) => match s {
+                    hyper::StatusCode::OK => log::debug!("Posted activate successfully"),
+                    x => log::debug!("Failed to post {:?}", x),
+                },
+                x => log::debug!("Failed to post {:?}", x),
             }
         }
 
@@ -868,22 +891,7 @@ pub mod updater {
             update.post_install_created();
         } else {
             // There was a residual setup_id from the last install...
-            if let Ok(resp) = reqwest::Client::new()
-                .post(env!("ACTIVATE_ENDPOINT"))
-                .header("Origin", env!("API_ORIGIN"))
-                .header("Content-Type", "application/json")
-                .body(format!(
-                    r#"{{"uuid":"{}", "version": "{}"}}"#,
-                    update.install_info.id, update.install_info.version,
-                ))
-                .send()
-            {
-                use reqwest::StatusCode;
-                match resp.status() {
-                    StatusCode::OK => log::debug!("Posted activate successfully"),
-                    x => log::debug!("Failed to post {:?}", x),
-                }
-            }
+            update.post_activate();
         }
 
         results
