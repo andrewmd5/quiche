@@ -14,6 +14,9 @@ fn main() {
     if !cfg!(target_os = "windows") {
         panic!("Only Windows builds are supported.");
     }
+
+    let mut api_origin = "";
+
     let profile = std::env::var("PROFILE").unwrap();
     match profile.as_str() {
         "release" => {
@@ -21,6 +24,10 @@ fn main() {
             if target != "i686-pc-windows-msvc" {
                 panic!("Build against i686-pc-windows-msvc for production releases. Only x32 is supported.");
             }
+            api_origin = find_cargo_field("prod_origin");
+        }
+        "debug" => {
+            api_origin = find_cargo_field("dev_origin");
         }
         _ => (),
     }
@@ -37,15 +44,18 @@ fn main() {
         find_cargo_field("release_path")
     );
     println!(
-        "cargo:rustc-env=INSTALL_ENDPOINT={}",
+        "cargo:rustc-env=INSTALL_ENDPOINT={}{}",
+        api_origin,
         find_cargo_field("install_endpoint")
     );
     println!(
-        "cargo:rustc-env=UPDATE_ENDPOINT={}",
+        "cargo:rustc-env=UPDATE_ENDPOINT={}{}",
+        api_origin,
         find_cargo_field("update_endpoint")
     );
     println!(
-        "cargo:rustc-env=ACTIVATE_ENDPOINT={}",
+        "cargo:rustc-env=ACTIVATE_ENDPOINT={}{}",
+        api_origin,
         find_cargo_field("activate_endpoint")
     );
     // println!(
