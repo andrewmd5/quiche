@@ -294,7 +294,9 @@ pub mod updater {
     use crate::os::files::{
         grant_full_permissions, take_ownership_of_dir, unblock_file, unblock_path,
     };
-    use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle};
+    use crate::os::windows::{
+        create_reg_key, get_reg_key, get_uninstallers, set_uninstall_value, RegistryHandle,
+    };
     use serde::{Deserialize, Serialize};
     use std::fs::{create_dir_all, remove_dir_all};
 
@@ -452,16 +454,10 @@ pub mod updater {
 
         pub fn store_installer_id(&mut self) {
             if let Some(id) = get_installer_id() {
-                log::debug!("Key is {:?}", &self.install_info.registry_key);
-                match set_uninstall_value(
-                    "SetupId",
-                    &id,
-                    &self.install_info.registry_key,
-                    self.install_info.registry_handle,
-                ) {
-                    Err(e) => log::debug!("Unable to set setupid value in registry {}", e),
-                    _ => log::debug!("Set setupid sucessfully"),
-                }
+                match set_rainway_key_value("SetupId", &id) {
+                    Ok(_) => log::debug!("Set key successfully!"),
+                    Err(e) => log::debug!("Unable to set key {}", e),
+                };
 
                 self.install_info.id = id;
             } else {
@@ -493,6 +489,14 @@ pub mod updater {
                 create_dir_all(&path)?;
             }
 
+            // Check if we have an install key
+            let setup_id = if let Ok(x) = get_rainway_key() {
+                x.setup_id
+            } else {
+                log::debug!("First time setup");
+                String::default()
+            };
+
             self.install_info = InstallInfo {
                 version: uninstaller.version,
                 branch: ReleaseBranch::from(uninstaller.branch),
@@ -500,7 +504,7 @@ pub mod updater {
                 path,
                 registry_key: uninstaller.key,
                 registry_handle: uninstaller.handle,
-                id: uninstaller.setup_id,
+                id: setup_id,
             };
             Ok(())
         }
@@ -888,7 +892,11 @@ pub mod updater {
         if update.install_info.id == "" {
             // New computer and new install so store the install of this installer specifically
             update.store_installer_id();
-            update.post_install_created();
+
+            // if we didnt find an id then there is no point trying to post a create
+            if update.install_info.id != "" {
+                update.post_install_created();
+            }
         } else {
             // There was a residual setup_id from the last install...
             update.post_activate();
@@ -961,5 +969,42 @@ pub mod updater {
             }
         }
         None
+    }
+
+    #[derive(Debug, Clone, Default)]
+    pub struct RainwayApp {
+        pub setup_id: String,
+    }
+
+    fn get_rainway_key() -> Result<RainwayApp, BootstrapError> {
+        let u_key = env!("RAINWAY_KEY");
+
+        let key = match create_reg_key(RegistryHandle::CurrentUser, u_key) {
+            Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(u_key.to_string())),
+            Ok(x) => x,
+        };
+
+        let app = RainwayApp {
+            setup_id: key.get_value("SetupId").unwrap_or_default(),
+        };
+
+        Ok(app)
+    }
+
+    fn set_rainway_key_value<N: AsRef<std::ffi::OsStr>, T: winreg::types::ToRegValue>(
+        subkey: N,
+        value: &T,
+    ) -> Result<(), BootstrapError> {
+        let u_key = env!("RAINWAY_KEY");
+
+        let key = match get_reg_key(RegistryHandle::CurrentUser, u_key) {
+            Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(u_key.to_string())),
+            Ok(x) => x,
+        };
+
+        match key.set_value(subkey, value) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(BootstrapError::UnableToSetRegKey(u_key.to_string())),
+        }
     }
 }

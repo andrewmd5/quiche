@@ -6,7 +6,7 @@ pub fn find_cargo_field(key: &'static str) -> &'static str {
         let end = line.rfind('"').unwrap();
         &line[start..end]
     } else {
-        panic!("failed parsing version from Cagro.toml");
+        panic!("failed parsing version from cargo.toml");
     }
 }
 
@@ -48,12 +48,16 @@ fn main() {
         "cargo:rustc-env=ACTIVATE_ENDPOINT={}",
         find_cargo_field("activate_endpoint")
     );
-    println!(
-        "cargo:rustc-env=DEACTIVATE_ENDPOINT={}",
-        find_cargo_field("deactivate_endpoint")
-    );
+    // println!(
+    //     "cargo:rustc-env=DEACTIVATE_ENDPOINT={}",
+    //     find_cargo_field("deactivate_endpoint")
+    // );
     println!(
         "cargo:rustc-env=API_ORIGIN={}",
         find_cargo_field("api_origin")
+    );
+    println!(
+        "cargo:rustc-env=RAINWAY_KEY={}",
+        find_cargo_field("rainway_key")
     );
 }
