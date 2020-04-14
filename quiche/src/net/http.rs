@@ -1,7 +1,7 @@
 use crate::etc::constants::BootstrapError;
 use hyper::body::HttpBody as _;
 use hyper::Client;
-use hyper::{Body, Request};
+use hyper::{header::HeaderValue, Body, Request};
 use hyper_tls::HttpsConnector;
 use serde::de::DeserializeOwned;
 use std::path::PathBuf;
@@ -144,7 +144,7 @@ where
 pub fn post(
     url: &str,
     json: String,
-    custom_headers: Option<std::collections::HashMap<&str, &str>>,
+    custom_headers: Option<std::collections::HashMap<&'static str, &'static str>>,
 ) -> Result<hyper::StatusCode, BootstrapError> {
     use tokio::runtime::Runtime;
     let mut runtime = match Runtime::new() {
@@ -157,19 +157,19 @@ pub fn post(
         https.https_only(true);
         let client = Client::builder().build::<_, hyper::Body>(https);
 
-        let builder = Request::builder().method("POST").uri(url);
-
-        // if let Some(header_map) = custom_headers {
-        //     for (k, v) in header_map {
-        //         builder.header(k, v);
-        //     }
-        // }
+        let mut builder = Request::builder().method("POST").uri(url);
+        if let Some(headers) = builder.headers_mut() {
+            if let Some(header_map) = custom_headers {
+                for (k, v) in header_map {
+                    headers.insert(k, HeaderValue::from_str(v).unwrap());
+                }
+            }
+        }
 
         let req = match builder.body(Body::from(json.as_bytes().to_owned())) {
             Ok(r) => r,
             Err(e) => return Err(BootstrapError::HttpFailed(e.to_string())),
         };
-
         let mut response = match client.request(req).await {
             Ok(g) => g,
             Err(e) => return Err(BootstrapError::HttpFailed(e.to_string())),
