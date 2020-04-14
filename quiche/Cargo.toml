@@ -12,7 +12,7 @@ uninstall_key = "{E312ACD2-6504-4A9E-A968-B12F0242385D}" # our AI product code
 rainway_key = "Software\\Rainway"
 
 dev_origin = "https://api-dev.rainway.com/v2/track/"
-prod_origin = "https://api-prod.rainway.com/v2/track/"
+prod_origin = "https://api-production.rainway.com/v2/track/"
 
 install_endpoint = "installed"
 update_endpoint = "updated"
