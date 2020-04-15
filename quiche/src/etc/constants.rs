@@ -35,7 +35,8 @@ pub enum BootstrapError {
     WebView(String),
     ResourceLoadError(String),
     IcoError(String),
-    UninstallEntryMissing
+    UninstallEntryMissing,
+    UnableToSetRegKey(String),
 }
 
 #[allow(non_snake_case)]
@@ -74,6 +75,7 @@ impl fmt::Display for BootstrapError {
             BootstrapError::ResourceLoadError(ref e) => write!(f, "Failed to load application resource. {0}", e),
             BootstrapError::IcoError(ref e) => write!(f, "{0}", e),
             BootstrapError::UninstallEntryMissing => write!(f, "No Uninstall key entry was present for {0}.", env!("UNINSTALL_KEY")),
+            BootstrapError::UnableToSetRegKey(ref e) => write!(f, "Unable to set regkey {0}", e),
         }
     }
 }
@@ -107,7 +109,6 @@ impl From<hyper::Error> for BootstrapError {
     }
 }
 
-
 impl From<std::io::Error> for BootstrapError {
     fn from(error: std::io::Error) -> Self {
         BootstrapError::IOError(error)
@@ -131,7 +132,6 @@ impl Default for UpdateType {
         UpdateType::Install
     }
 }
-
 
 impl fmt::Display for UpdateType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

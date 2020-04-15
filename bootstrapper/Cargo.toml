@@ -28,3 +28,4 @@ sentry = { version = "0.18.0", features = ["with_device_info", "with_panic", "wi
 winapi = { version = "0.3.8", features = ["winuser", "combaseapi", "objbase", "shellapi"] }
 log = "0.4.8"
 fern = { version = "0.6.0", features = ["colored"] }
+quote = "=1.0.1"

@@ -290,17 +290,19 @@ pub mod updater {
     };
     use crate::io::hash::sha_256;
     use crate::io::zip::unzip;
-    use crate::net::http::{download_file, download_toml};
+    use crate::net::http::{download_file, download_toml, post};
     use crate::os::files::{
         grant_full_permissions, take_ownership_of_dir, unblock_file, unblock_path,
     };
-    use crate::os::windows::{get_uninstallers, set_uninstall_value, RegistryHandle};
+    use crate::os::windows::{
+        create_reg_key, get_reg_key, get_uninstallers, set_uninstall_value, RegistryHandle,
+    };
     use serde::{Deserialize, Serialize};
     use std::fs::{create_dir_all, remove_dir_all};
 
     use std::{
         env::{temp_dir, var},
-        path::{Path, PathBuf}
+        path::{Path, PathBuf},
     };
 
     /// a struct that represents information found in the uninstall key registry entry
@@ -312,6 +314,7 @@ pub mod updater {
         pub branch: ReleaseBranch,
         pub registry_key: String,
         pub registry_handle: RegistryHandle,
+        pub id: String,
     }
 
     #[derive(Debug, PartialEq)]
@@ -331,8 +334,7 @@ pub mod updater {
         Stable,
         Beta,
         Nightly,
-    } 
-    
+    }
     #[derive(Default, Clone)]
     pub struct ActiveUpdate {
         /// identifies if the current update is a full install or a patch.
@@ -450,6 +452,19 @@ pub mod updater {
             }
         }
 
+        pub fn store_installer_id(&mut self) {
+            if let Some(id) = get_installer_id() {
+                match set_rainway_key_value("SetupId", &id) {
+                    Ok(_) => log::debug!("Set key successfully!"),
+                    Err(e) => log::debug!("Unable to set key {}", e),
+                };
+
+                self.install_info.id = id;
+            } else {
+                log::debug!("Could not find chief tags for setupid id")
+            }
+        }
+
         /// retreives information on the current installed version of the parent software
         pub fn get_install_info(&mut self) -> Result<(), BootstrapError> {
             let uninstallers = get_uninstallers()?;
@@ -473,6 +488,15 @@ pub mod updater {
             if !path.exists() {
                 create_dir_all(&path)?;
             }
+
+            // Check if we have an install key
+            let setup_id = if let Ok(x) = get_rainway_key() {
+                x.setup_id
+            } else {
+                log::debug!("First time setup");
+                String::default()
+            };
+
             self.install_info = InstallInfo {
                 version: uninstaller.version,
                 branch: ReleaseBranch::from(uninstaller.branch),
@@ -480,8 +504,74 @@ pub mod updater {
                 path,
                 registry_key: uninstaller.key,
                 registry_handle: uninstaller.handle,
+                id: setup_id,
             };
             Ok(())
+        }
+
+        pub fn post_headers() -> std::collections::HashMap<&'static str, &'static str> {
+            use std::collections::HashMap;
+
+            // Headers that we want to send on post requests to the api
+
+            [
+                ("Origin", env!("API_ORIGIN")),
+                ("Content-Type", "application/json"),
+            ]
+            .iter()
+            .cloned()
+            .collect()
+        }
+
+        pub fn post_install_created(&self) {
+            match post(
+                env!("INSTALL_ENDPOINT"),
+                format!(
+                    r#"{{"uuid":"{}", "version": "{}"}}"#,
+                    self.install_info.id, self.install_info.version,
+                ),
+                Some(ActiveUpdate::post_headers()),
+            ) {
+                Ok(s) => match s {
+                    hyper::StatusCode::OK => log::debug!("Posted install successfully"),
+                    x => log::debug!("Failed to post {:?}", x),
+                },
+                x => log::debug!("Failed to post {:?}", x),
+            }
+        }
+
+        pub fn post_update(&self) {
+            match post(
+                env!("UPDATE_ENDPOINT"),
+                format!(
+                    r#"{{"uuid":"{}", "version": "{}"}}"#,
+                    self.install_info.id, self.install_info.version,
+                ),
+                Some(ActiveUpdate::post_headers()),
+            ) {
+                Ok(s) => match s {
+                    hyper::StatusCode::OK => log::debug!("Posted install successfully"),
+                    x => log::debug!("Failed to post {:?}", x),
+                },
+                x => log::debug!("Failed to post {:?}", x),
+            }
+        }
+
+        pub fn post_activate(&self) {
+            match post(
+                env!("ACTIVATE_ENDPOINT"),
+                format!(
+                    r#"{{"uuid":"{}", "version": "{}"}}"#,
+                    self.install_info.id, self.install_info.version,
+                ),
+                Some(ActiveUpdate::post_headers()),
+            ) {
+                Ok(s) => match s {
+                    hyper::StatusCode::OK => log::debug!("Posted activate successfully"),
+                    x => log::debug!("Failed to post {:?}", x),
+                },
+                x => log::debug!("Failed to post {:?}", x),
+            }
         }
 
         pub fn try_self_care(&mut self) -> Result<(), BootstrapError> {
@@ -765,15 +855,17 @@ pub mod updater {
         log::info!("update went off without a hitch.");
 
         update.update_display_version();
-        Ok("Rainway updated!".to_string())
 
+        update.post_update();
+
+        Ok("Rainway updated!".to_string())
         //dir_contains_all_files(package_files, &install_path);
     }
 
     /// Runs the full installer and waits for it to exit.
     /// The bootstrapper will not launch Rainway after this.
     /// The installer should be configured to launch post-install.
-    pub fn install(update: ActiveUpdate) -> Result<String, String> {
+    pub fn install(update: &mut ActiveUpdate) -> Result<String, String> {
         use std::os::windows::process::CommandExt;
         use std::process::Command;
         let mut download_path = temp_dir();
@@ -794,6 +886,22 @@ pub mod updater {
         } else {
             log::warn!("No output");
         }
+
+        update.get_install_info();
+
+        if update.install_info.id == "" {
+            // New computer and new install so store the install of this installer specifically
+            update.store_installer_id();
+
+            // if we didnt find an id then there is no point trying to post a create
+            if update.install_info.id != "" {
+                update.post_install_created();
+            }
+        } else {
+            // There was a residual setup_id from the last install...
+            update.post_activate();
+        }
+
         results
     }
 
@@ -804,5 +912,99 @@ pub mod updater {
         Ok(uninstallers
             .into_iter()
             .any(|u| u.key == env!("UNINSTALL_KEY")))
+    }
+
+    fn get_installer_id() -> Option<String> {
+        use std::fs::File;
+        use std::io::{prelude::*, BufReader};
+        let exe = match std::env::current_exe() {
+            Ok(e) => e,
+            Err(_) => return None,
+        };
+
+        let setup = match File::open(exe) {
+            Ok(f) => f,
+            Err(_) => return None,
+        };
+
+        fn find2(start: usize, haystack: &[u8], needle: &[u8]) -> Option<usize> {
+            (&haystack[start..])
+                .windows(needle.len())
+                .position(|window| window == needle)
+        }
+
+        let chief_bytes = &"<chief>".to_owned().into_bytes();
+        let end_chief_bytes = &"</chief>".to_owned().into_bytes();
+
+        let mut buffer = Vec::new();
+        let mut reader = BufReader::new(setup);
+
+        if let Ok(size) = reader.read_to_end(&mut buffer) {
+            let mut cur = 0 as usize;
+            while cur < buffer.len() {
+                let start = find2(cur, &buffer, chief_bytes);
+                let end = find2(cur, &buffer, end_chief_bytes);
+
+                match (start, end) {
+                    (Some(start), Some(end)) => {
+                        let start = start + cur;
+                        let end = end + cur;
+                        if end > start && end - start > chief_bytes.len() {
+                            let s = &buffer[start + chief_bytes.len()..end];
+                            if let Ok(s) = String::from_utf8(s.to_vec()) {
+                                return Some(s);
+                            }
+
+                            return None;
+                        } else {
+                            cur = end + 2;
+                            continue;
+                        }
+                    }
+
+                    _ => {
+                        return None;
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    #[derive(Debug, Clone, Default)]
+    pub struct RainwayApp {
+        pub setup_id: String,
+    }
+
+    fn get_rainway_key() -> Result<RainwayApp, BootstrapError> {
+        let u_key = env!("RAINWAY_KEY");
+
+        let key = match create_reg_key(RegistryHandle::CurrentUser, u_key) {
+            Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(u_key.to_string())),
+            Ok(x) => x,
+        };
+
+        let app = RainwayApp {
+            setup_id: key.get_value("SetupId").unwrap_or_default(),
+        };
+
+        Ok(app)
+    }
+
+    fn set_rainway_key_value<N: AsRef<std::ffi::OsStr>, T: winreg::types::ToRegValue>(
+        subkey: N,
+        value: &T,
+    ) -> Result<(), BootstrapError> {
+        let u_key = env!("RAINWAY_KEY");
+
+        let key = match get_reg_key(RegistryHandle::CurrentUser, u_key) {
+            Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(u_key.to_string())),
+            Ok(x) => x,
+        };
+
+        match key.set_value(subkey, value) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(BootstrapError::UnableToSetRegKey(u_key.to_string())),
+        }
     }
 }

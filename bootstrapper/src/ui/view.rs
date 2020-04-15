@@ -24,11 +24,11 @@ pub fn launch_and_close<T: 'static>(_webview: &mut WebView<'_, T>, update: &Acti
 pub fn apply_update<T: 'static>(webview: &mut WebView<'_, T>, update: &ActiveUpdate) {
     let update_complete = "updateComplete";
     let error_callback = "updateFailed";
-    let ud = update.clone();
+    let mut ud = update.clone();
     run_async(
         webview,
         move || match ud.update_type {
-            UpdateType::Install => install(ud),
+            UpdateType::Install => install(&mut ud),
             UpdateType::Patch => apply(ud),
         },
         update_complete.to_string(),

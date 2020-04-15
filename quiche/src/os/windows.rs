@@ -305,3 +305,24 @@ fn get_uninstallers_from_key(handle: RegistryHandle) -> Result<Vec<InstalledApp>
     }
     Ok(apps)
 }
+
+pub fn get_reg_key(handle: RegistryHandle, key: &str) -> Result<RegKey, BootstrapError> {
+    let hkey = RegKey::predef(handle as isize as HKEY);
+
+    match hkey.open_subkey_with_flags(key, KEY_ALL_ACCESS | KEY_WOW64_64KEY) {
+        Ok(u) => Ok(u),
+        Err(_e) => Err(BootstrapError::RegistryKeyNotFound(key.to_string())),
+    }
+}
+
+pub fn create_reg_key(handle: RegistryHandle, key: &str) -> Result<RegKey, BootstrapError> {
+    let hkey = RegKey::predef(handle as isize as HKEY);
+
+    match hkey.open_subkey_with_flags(key, KEY_READ | KEY_WOW64_64KEY) {
+        Ok(u) => Ok(u),
+        Err(_e) => match hkey.create_subkey_with_flags(key, KEY_ALL_ACCESS | KEY_WOW64_64KEY) {
+            Ok((u, _)) => Ok(u),
+            Err(_e) => Err(BootstrapError::RegistryKeyNotFound(key.to_string())),
+        },
+    }
+}

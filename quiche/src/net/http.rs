@@ -1,7 +1,7 @@
 use crate::etc::constants::BootstrapError;
 use hyper::body::HttpBody as _;
 use hyper::Client;
-use hyper::{Body, Request};
+use hyper::{header::HeaderValue, Body, Request};
 use hyper_tls::HttpsConnector;
 use serde::de::DeserializeOwned;
 use std::path::PathBuf;
@@ -138,4 +138,47 @@ where
     temp_file.flush().await?;
     drop(temp_file);
     Ok(total_downloaded_bytes == total_size)
+}
+
+// Blocking post a body to a url
+pub fn post(
+    url: &str,
+    json: String,
+    custom_headers: Option<std::collections::HashMap<&'static str, &'static str>>,
+) -> Result<hyper::StatusCode, BootstrapError> {
+    use tokio::runtime::Runtime;
+    let mut runtime = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => return Err(BootstrapError::from(e)),
+    };
+
+    let results = runtime.block_on(async {
+        let mut https = HttpsConnector::new();
+        https.https_only(true);
+        let client = Client::builder().build::<_, hyper::Body>(https);
+
+        let mut builder = Request::builder().method("POST").uri(url);
+        if let Some(headers) = builder.headers_mut() {
+            if let Some(header_map) = custom_headers {
+                for (k, v) in header_map {
+                    headers.insert(k, HeaderValue::from_str(v).unwrap());
+                }
+            }
+        }
+
+        let req = match builder.body(Body::from(json.as_bytes().to_owned())) {
+            Ok(r) => r,
+            Err(e) => return Err(BootstrapError::HttpFailed(e.to_string())),
+        };
+        let mut response = match client.request(req).await {
+            Ok(g) => g,
+            Err(e) => return Err(BootstrapError::HttpFailed(e.to_string())),
+        };
+
+        Ok(response.status())
+    });
+
+    drop(runtime);
+
+    results
 }

@@ -6,7 +6,7 @@ pub fn find_cargo_field(key: &'static str) -> &'static str {
         let end = line.rfind('"').unwrap();
         &line[start..end]
     } else {
-        panic!("failed parsing version from Cagro.toml");
+        panic!("failed parsing version from cargo.toml");
     }
 }
 
@@ -14,6 +14,9 @@ fn main() {
     if !cfg!(target_os = "windows") {
         panic!("Only Windows builds are supported.");
     }
+
+    let mut api_origin = "";
+
     let profile = std::env::var("PROFILE").unwrap();
     match profile.as_str() {
         "release" => {
@@ -21,6 +24,10 @@ fn main() {
             if target != "i686-pc-windows-msvc" {
                 panic!("Build against i686-pc-windows-msvc for production releases. Only x32 is supported.");
             }
+            api_origin = find_cargo_field("prod_origin");
+        }
+        "debug" => {
+            api_origin = find_cargo_field("dev_origin");
         }
         _ => (),
     }
@@ -35,5 +42,32 @@ fn main() {
     println!(
         "cargo:rustc-env=RELEASE_PATH={}",
         find_cargo_field("release_path")
+    );
+    println!(
+        "cargo:rustc-env=INSTALL_ENDPOINT={}{}",
+        api_origin,
+        find_cargo_field("install_endpoint")
+    );
+    println!(
+        "cargo:rustc-env=UPDATE_ENDPOINT={}{}",
+        api_origin,
+        find_cargo_field("update_endpoint")
+    );
+    println!(
+        "cargo:rustc-env=ACTIVATE_ENDPOINT={}{}",
+        api_origin,
+        find_cargo_field("activate_endpoint")
+    );
+    // println!(
+    //     "cargo:rustc-env=DEACTIVATE_ENDPOINT={}",
+    //     find_cargo_field("deactivate_endpoint")
+    // );
+    println!(
+        "cargo:rustc-env=API_ORIGIN={}",
+        find_cargo_field("api_origin")
+    );
+    println!(
+        "cargo:rustc-env=RAINWAY_KEY={}",
+        find_cargo_field("rainway_key")
     );
 }
