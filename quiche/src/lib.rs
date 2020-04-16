@@ -466,7 +466,7 @@ pub mod updater {
         }
 
         fn store_event(&self, newState: RainwayAppState) {
-            match set_rainway_key_value("InstallState", &(newState as u32)) {
+            match set_rainway_key_value("SetupState", &(newState as u32)) {
                 Ok(_) => log::debug!("Set install state successfully!"),
                 Err(e) => log::debug!("Unable to set install state {}", e),
             };
@@ -981,20 +981,20 @@ pub mod updater {
     }
 
     enum RainwayAppState {
-        Install = 0,
+        Nothing = 0,
         Activate = 1,
         Update = 2,
         Deactivate = 3,
-        Nothing = 4,
+        Install = 4,
     }
 
     impl From<u32> for RainwayAppState {
         fn from(x: u32) -> Self {
             match x {
-                0 => RainwayAppState::Install,
                 1 => RainwayAppState::Activate,
                 2 => RainwayAppState::Update,
                 3 => RainwayAppState::Deactivate,
+                4 => RainwayAppState::Install,
                 _ => RainwayAppState::Nothing,
             }
         }
@@ -1016,7 +1016,7 @@ pub mod updater {
         let app = RainwayApp {
             setup_id: key.get_value("SetupId").unwrap_or_default(),
             install_state: RainwayAppState::from(
-                key.get_value::<u32, &str>("InstallState")
+                key.get_value::<u32, &str>("SetupState")
                     .unwrap_or(RainwayAppState::Nothing as u32),
             ),
         };
