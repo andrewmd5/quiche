@@ -897,9 +897,6 @@ pub mod updater {
         // Write the install id to registry
         // along with what happened
 
-        update.get_install_info();
-        let had_install_id = update.install_info.id != "";
-
         update.store_installer_id();
 
         update.store_event(RainwayAppState::Activate);
