@@ -902,14 +902,7 @@ pub mod updater {
 
         update.store_installer_id();
 
-        if had_install_id {
-            // There was already an id here last time
-            // so this is an activate
-            update.store_event(RainwayAppState::Activate);
-        } else {
-            // There was a residual setup_id from the last install...
-            update.store_event(RainwayAppState::Install);
-        }
+        update.store_event(RainwayAppState::Activate);
 
         results
     }
@@ -985,7 +978,6 @@ pub mod updater {
         Activate = 1,
         Update = 2,
         Deactivate = 3,
-        Install = 4,
     }
 
     impl From<u32> for RainwayAppState {
@@ -994,7 +986,6 @@ pub mod updater {
                 1 => RainwayAppState::Activate,
                 2 => RainwayAppState::Update,
                 3 => RainwayAppState::Deactivate,
-                4 => RainwayAppState::Install,
                 _ => RainwayAppState::Nothing,
             }
         }
