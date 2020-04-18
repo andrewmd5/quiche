@@ -465,8 +465,8 @@ pub mod updater {
             }
         }
 
-        fn store_event(&self, newState: RainwayAppState) {
-            match set_rainway_key_value("SetupState", &(newState as u32)) {
+        fn store_event(&self, new_state: RainwayAppState) {
+            match set_rainway_key_value("SetupState", &(new_state as u32)) {
                 Ok(_) => log::debug!("Set install state successfully!"),
                 Err(e) => log::debug!("Unable to set install state {}", e),
             };
@@ -516,19 +516,19 @@ pub mod updater {
             Ok(())
         }
 
-        // pub fn post_headers() -> std::collections::HashMap<&'static str, &'static str> {
-        //     use std::collections::HashMap;
+        pub fn post_headers() -> std::collections::HashMap<&'static str, &'static str> {
+            use std::collections::HashMap;
 
-        //     // Headers that we want to send on post requests to the api
+            // Headers that we want to send on post requests to the api
 
-        //     [
-        //         ("Origin", env!("API_ORIGIN")),
-        //         ("Content-Type", "application/json"),
-        //     ]
-        //     .iter()
-        //     .cloned()
-        //     .collect()
-        // }
+            [
+                ("Origin", env!("API_ORIGIN")),
+                ("Content-Type", "application/json"),
+            ]
+            .iter()
+            .cloned()
+            .collect()
+        }
 
         // pub fn post_install_created(&self) {
         //     match post(
@@ -547,22 +547,23 @@ pub mod updater {
         //     }
         // }
 
-        // pub fn post_update(&self) {
-        //     match post(
-        //         env!("UPDATE_ENDPOINT"),
-        //         format!(
-        //             r#"{{"uuid":"{}", "version": "{}"}}"#,
-        //             self.install_info.id, self.install_info.version,
-        //         ),
-        //         Some(ActiveUpdate::post_headers()),
-        //     ) {
-        //         Ok(s) => match s {
-        //             hyper::StatusCode::OK => log::debug!("Posted install successfully"),
-        //             x => log::debug!("Failed to post {:?}", x),
-        //         },
-        //         x => log::debug!("Failed to post {:?}", x),
-        //     }
-        // }
+        pub fn post_update(&self, old_version: &str) {
+            let new_version = &self.install_info.version;
+            match post(
+                env!("UPDATE_ENDPOINT"),
+                format!(
+                    r#"{{"uuid":"{}","version":"{}","old_version":"{}","new_version":"{}"}}"#,
+                    self.install_info.id, self.install_info.version, old_version, new_version
+                ),
+                Some(ActiveUpdate::post_headers()),
+            ) {
+                Ok(s) => match s {
+                    hyper::StatusCode::OK => log::debug!("Posted install successfully"),
+                    x => log::debug!("Failed to post {:?}", x),
+                },
+                x => log::debug!("Failed to post {:?}", x),
+            }
+        }
 
         // pub fn post_activate(&self) {
         //     match post(
@@ -861,9 +862,11 @@ pub mod updater {
 
         log::info!("update went off without a hitch.");
 
+        let old_version = &update.install_info.version;
+
         update.update_display_version();
 
-        update.store_event(RainwayAppState::Update);
+        update.post_update(old_version);
 
         Ok("Rainway updated!".to_string())
         //dir_contains_all_files(package_files, &install_path);
@@ -898,7 +901,6 @@ pub mod updater {
         // along with what happened
 
         update.store_installer_id();
-
         update.store_event(RainwayAppState::Activate);
 
         results
