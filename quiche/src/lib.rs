@@ -558,29 +558,29 @@ pub mod updater {
                 Some(ActiveUpdate::post_headers()),
             ) {
                 Ok(s) => match s {
-                    hyper::StatusCode::OK => log::debug!("Posted install successfully"),
+                    hyper::StatusCode::OK => log::debug!("Posted update successfully"),
                     x => log::debug!("Failed to post {:?}", x),
                 },
                 x => log::debug!("Failed to post {:?}", x),
             }
         }
 
-        // pub fn post_activate(&self) {
-        //     match post(
-        //         env!("ACTIVATE_ENDPOINT"),
-        //         format!(
-        //             r#"{{"uuid":"{}", "version": "{}"}}"#,
-        //             self.install_info.id, self.install_info.version,
-        //         ),
-        //         Some(ActiveUpdate::post_headers()),
-        //     ) {
-        //         Ok(s) => match s {
-        //             hyper::StatusCode::OK => log::debug!("Posted activate successfully"),
-        //             x => log::debug!("Failed to post {:?}", x),
-        //         },
-        //         x => log::debug!("Failed to post {:?}", x),
-        //     }
-        // }
+        pub fn post_install(&self) {
+            match post(
+                env!("INSTALL_ENDPOINT"),
+                format!(
+                    r#"{{"uuid":"{}", "version": "{}"}}"#,
+                    self.install_info.id, self.install_info.version,
+                ),
+                Some(ActiveUpdate::post_headers()),
+            ) {
+                Ok(s) => match s {
+                    hyper::StatusCode::OK => log::debug!("Posted install successfully"),
+                    x => log::debug!("Failed to post {:?}", x),
+                },
+                x => log::debug!("Failed to post {:?}", x),
+            }
+        }
 
         pub fn try_self_care(&mut self) -> Result<(), BootstrapError> {
             use std::fs::remove_file;
@@ -901,6 +901,7 @@ pub mod updater {
         // along with what happened
 
         update.store_installer_id();
+        update.post_install();
         update.store_event(RainwayAppState::Activate);
 
         results
