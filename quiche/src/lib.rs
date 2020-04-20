@@ -552,8 +552,8 @@ pub mod updater {
             match post(
                 env!("UPDATE_ENDPOINT"),
                 format!(
-                    r#"{{"uuid":"{}","version":"{}","old_version":"{}","new_version":"{}"}}"#,
-                    self.install_info.id, self.install_info.version, old_version, new_version
+                    r#"{{"uuid":"{}","version":"{}","lastVersion":"{}"}}"#,
+                    self.install_info.id, self.install_info.version, old_version
                 ),
                 Some(ActiveUpdate::post_headers()),
             ) {
