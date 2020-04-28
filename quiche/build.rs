@@ -58,10 +58,11 @@ fn main() {
         api_origin,
         find_cargo_field("activate_endpoint")
     );
-    // println!(
-    //     "cargo:rustc-env=DEACTIVATE_ENDPOINT={}",
-    //     find_cargo_field("deactivate_endpoint")
-    // );
+    println!(
+        "cargo:rustc-env=DEACTIVATE_ENDPOINT={}{}",
+        api_origin,
+        find_cargo_field("deactivate_endpoint")
+    );
     println!(
         "cargo:rustc-env=API_ORIGIN={}",
         find_cargo_field("api_origin")

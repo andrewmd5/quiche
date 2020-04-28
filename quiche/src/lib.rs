@@ -465,15 +465,14 @@ pub mod updater {
             }
         }
 
-        fn store_event(&self, new_state: RainwayAppState) {
+        pub fn store_event(new_state: RainwayAppState) {
             match set_rainway_key_value("SetupState", &(new_state as u32)) {
                 Ok(_) => log::debug!("Set install state successfully!"),
                 Err(e) => log::debug!("Unable to set install state {}", e),
             };
         }
 
-        /// retreives information on the current installed version of the parent software
-        pub fn get_install_info(&mut self) -> Result<(), BootstrapError> {
+        pub fn get_install_info() -> Result<InstallInfo, BootstrapError> {
             let uninstallers = get_uninstallers()?;
             let uninstaller = match uninstallers
                 .into_iter()
@@ -482,6 +481,7 @@ pub mod updater {
                 Some(u) => u,
                 None => return Err(BootstrapError::UninstallEntryMissing),
             };
+
             if uninstaller.version.is_empty() {
                 return Err(BootstrapError::LocalVersionMissing);
             }
@@ -504,7 +504,7 @@ pub mod updater {
                 String::default()
             };
 
-            self.install_info = InstallInfo {
+            let install_info = InstallInfo {
                 version: uninstaller.version,
                 branch: ReleaseBranch::from(uninstaller.branch),
                 name: uninstaller.name,
@@ -513,7 +513,18 @@ pub mod updater {
                 registry_handle: uninstaller.handle,
                 id: setup_id,
             };
-            Ok(())
+            Ok(install_info)
+        }
+
+        /// retreives information on the current installed version of the parent software
+        pub fn store_install_info(&mut self) -> Result<(), BootstrapError> {
+            match ActiveUpdate::get_install_info() {
+                Ok(install_info) => {
+                    self.install_info = install_info;
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            }
         }
 
         pub fn post_headers() -> std::collections::HashMap<&'static str, &'static str> {
@@ -902,7 +913,7 @@ pub mod updater {
 
         update.store_installer_id();
         update.post_install();
-        update.store_event(RainwayAppState::Activate);
+        ActiveUpdate::store_event(RainwayAppState::Activate);
 
         results
     }
@@ -973,7 +984,7 @@ pub mod updater {
         None
     }
 
-    enum RainwayAppState {
+    pub enum RainwayAppState {
         Nothing = 0,
         Activate = 1,
         Update = 2,
@@ -991,12 +1002,12 @@ pub mod updater {
         }
     }
 
-    struct RainwayApp {
+    pub struct RainwayApp {
         pub setup_id: String,
         pub install_state: RainwayAppState,
     }
 
-    fn get_rainway_key() -> Result<RainwayApp, BootstrapError> {
+    pub fn get_rainway_key() -> Result<RainwayApp, BootstrapError> {
         let u_key = env!("RAINWAY_KEY");
 
         let key = match create_reg_key(RegistryHandle::CurrentUser, u_key) {
@@ -1029,6 +1040,22 @@ pub mod updater {
         match key.set_value(subkey, value) {
             Ok(_) => Ok(()),
             Err(e) => Err(BootstrapError::UnableToSetRegKey(u_key.to_string())),
+        }
+    }
+
+    pub fn post_deactivate(setup_id: String, version: String) {
+        let headers = ActiveUpdate::post_headers();
+
+        match post(
+            env!("DEACTIVATE_ENDPOINT"),
+            format!(r#"{{"uuid":"{}", "version": "{}"}}"#, setup_id, version,),
+            Some(ActiveUpdate::post_headers()),
+        ) {
+            Ok(s) => match s {
+                hyper::StatusCode::OK => log::debug!("Posted deactivate successfully"),
+                x => log::debug!("Failed to post {:?}", x),
+            },
+            x => log::debug!("Failed to post {:?}", x),
         }
     }
 }

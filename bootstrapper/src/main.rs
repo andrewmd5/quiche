@@ -39,6 +39,14 @@ fn main() -> Result<(), BootstrapError> {
 
     setup_logging(verbosity).expect("failed to initialize logging.");
 
+    // If we get an uninstall argument then do that and exit straight up
+    // without spinning up anything else
+    let mut args = std::env::args();
+    if args.any(|x| x == "uninstall") {
+        post_uninstall();
+        return Ok(());
+    }
+
     if let Err(e) = run() {
         match e {
             BootstrapError::NeedWindowsMediaPack(_) => {
@@ -79,7 +87,7 @@ fn run() -> Result<(), BootstrapError> {
     if !rainway_installed {
         update.update_type = UpdateType::Install;
     } else {
-        if let Err(e) = update.get_install_info() {
+        if let Err(e) = update.store_install_info() {
             launch_rainway(&update.install_info.path);
             return Err(e);
         }
@@ -303,4 +311,17 @@ fn add_breadcrumb(message: String, level: Level) {
         message: Some(message.into()),
         ..Default::default()
     });
+}
+
+fn post_uninstall() {
+    // Find our install key
+    use quiche::updater;
+    if let Ok(rainway_app) = updater::get_rainway_key() {
+        if let Ok(install_info) = ActiveUpdate::get_install_info() {
+            // Now we have all the info we want to send
+            ActiveUpdate::store_event(updater::RainwayAppState::Deactivate);
+
+            updater::post_deactivate(rainway_app.setup_id, install_info.version);
+        }
+    }
 }
