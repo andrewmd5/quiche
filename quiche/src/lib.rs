@@ -452,7 +452,7 @@ pub mod updater {
             }
         }
 
-        pub fn store_installer_id(&mut self) {
+        fn store_installer_id(&mut self) {
             if let Some(id) = get_installer_id() {
                 match set_rainway_key_value("SetupId", &id) {
                     Ok(_) => log::debug!("Set key successfully!"),
@@ -465,8 +465,14 @@ pub mod updater {
             }
         }
 
-        /// retreives information on the current installed version of the parent software
-        pub fn get_install_info(&mut self) -> Result<(), BootstrapError> {
+        pub fn store_event(new_state: RainwayAppState) {
+            match set_rainway_key_value("SetupState", &(new_state as u32)) {
+                Ok(_) => log::debug!("Set install state successfully!"),
+                Err(e) => log::debug!("Unable to set install state {}", e),
+            };
+        }
+
+        pub fn get_install_info() -> Result<InstallInfo, BootstrapError> {
             let uninstallers = get_uninstallers()?;
             let uninstaller = match uninstallers
                 .into_iter()
@@ -475,6 +481,7 @@ pub mod updater {
                 Some(u) => u,
                 None => return Err(BootstrapError::UninstallEntryMissing),
             };
+
             if uninstaller.version.is_empty() {
                 return Err(BootstrapError::LocalVersionMissing);
             }
@@ -497,7 +504,7 @@ pub mod updater {
                 String::default()
             };
 
-            self.install_info = InstallInfo {
+            let install_info = InstallInfo {
                 version: uninstaller.version,
                 branch: ReleaseBranch::from(uninstaller.branch),
                 name: uninstaller.name,
@@ -506,7 +513,18 @@ pub mod updater {
                 registry_handle: uninstaller.handle,
                 id: setup_id,
             };
-            Ok(())
+            Ok(install_info)
+        }
+
+        /// retreives information on the current installed version of the parent software
+        pub fn store_install_info(&mut self) -> Result<(), BootstrapError> {
+            match ActiveUpdate::get_install_info() {
+                Ok(install_info) => {
+                    self.install_info = install_info;
+                    Ok(())
+                }
+                Err(e) => Err(e),
+            }
         }
 
         pub fn post_headers() -> std::collections::HashMap<&'static str, &'static str> {
@@ -523,7 +541,42 @@ pub mod updater {
             .collect()
         }
 
-        pub fn post_install_created(&self) {
+        // pub fn post_install_created(&self) {
+        //     match post(
+        //         env!("INSTALL_ENDPOINT"),
+        //         format!(
+        //             r#"{{"uuid":"{}", "version": "{}"}}"#,
+        //             self.install_info.id, self.install_info.version,
+        //         ),
+        //         Some(ActiveUpdate::post_headers()),
+        //     ) {
+        //         Ok(s) => match s {
+        //             hyper::StatusCode::OK => log::debug!("Posted install successfully"),
+        //             x => log::debug!("Failed to post {:?}", x),
+        //         },
+        //         x => log::debug!("Failed to post {:?}", x),
+        //     }
+        // }
+
+        pub fn post_update(&self, old_version: &str) {
+            let new_version = &self.install_info.version;
+            match post(
+                env!("UPDATE_ENDPOINT"),
+                format!(
+                    r#"{{"uuid":"{}","version":"{}","lastVersion":"{}"}}"#,
+                    self.install_info.id, self.install_info.version, old_version
+                ),
+                Some(ActiveUpdate::post_headers()),
+            ) {
+                Ok(s) => match s {
+                    hyper::StatusCode::OK => log::debug!("Posted update successfully"),
+                    x => log::debug!("Failed to post {:?}", x),
+                },
+                x => log::debug!("Failed to post {:?}", x),
+            }
+        }
+
+        pub fn post_install(&self) {
             match post(
                 env!("INSTALL_ENDPOINT"),
                 format!(
@@ -534,40 +587,6 @@ pub mod updater {
             ) {
                 Ok(s) => match s {
                     hyper::StatusCode::OK => log::debug!("Posted install successfully"),
-                    x => log::debug!("Failed to post {:?}", x),
-                },
-                x => log::debug!("Failed to post {:?}", x),
-            }
-        }
-
-        pub fn post_update(&self) {
-            match post(
-                env!("UPDATE_ENDPOINT"),
-                format!(
-                    r#"{{"uuid":"{}", "version": "{}"}}"#,
-                    self.install_info.id, self.install_info.version,
-                ),
-                Some(ActiveUpdate::post_headers()),
-            ) {
-                Ok(s) => match s {
-                    hyper::StatusCode::OK => log::debug!("Posted install successfully"),
-                    x => log::debug!("Failed to post {:?}", x),
-                },
-                x => log::debug!("Failed to post {:?}", x),
-            }
-        }
-
-        pub fn post_activate(&self) {
-            match post(
-                env!("ACTIVATE_ENDPOINT"),
-                format!(
-                    r#"{{"uuid":"{}", "version": "{}"}}"#,
-                    self.install_info.id, self.install_info.version,
-                ),
-                Some(ActiveUpdate::post_headers()),
-            ) {
-                Ok(s) => match s {
-                    hyper::StatusCode::OK => log::debug!("Posted activate successfully"),
                     x => log::debug!("Failed to post {:?}", x),
                 },
                 x => log::debug!("Failed to post {:?}", x),
@@ -854,9 +873,11 @@ pub mod updater {
 
         log::info!("update went off without a hitch.");
 
+        let old_version = &update.install_info.version;
+
         update.update_display_version();
 
-        update.post_update();
+        update.post_update(old_version);
 
         Ok("Rainway updated!".to_string())
         //dir_contains_all_files(package_files, &install_path);
@@ -887,20 +908,12 @@ pub mod updater {
             log::warn!("No output");
         }
 
-        update.get_install_info();
+        // Write the install id to registry
+        // along with what happened
 
-        if update.install_info.id == "" {
-            // New computer and new install so store the install of this installer specifically
-            update.store_installer_id();
-
-            // if we didnt find an id then there is no point trying to post a create
-            if update.install_info.id != "" {
-                update.post_install_created();
-            }
-        } else {
-            // There was a residual setup_id from the last install...
-            update.post_activate();
-        }
+        update.store_installer_id();
+        update.post_install();
+        ActiveUpdate::store_event(RainwayAppState::Activate);
 
         results
     }
@@ -971,12 +984,30 @@ pub mod updater {
         None
     }
 
-    #[derive(Debug, Clone, Default)]
-    pub struct RainwayApp {
-        pub setup_id: String,
+    pub enum RainwayAppState {
+        Nothing = 0,
+        Activate = 1,
+        Update = 2,
+        Deactivate = 3,
     }
 
-    fn get_rainway_key() -> Result<RainwayApp, BootstrapError> {
+    impl From<u32> for RainwayAppState {
+        fn from(x: u32) -> Self {
+            match x {
+                1 => RainwayAppState::Activate,
+                2 => RainwayAppState::Update,
+                3 => RainwayAppState::Deactivate,
+                _ => RainwayAppState::Nothing,
+            }
+        }
+    }
+
+    pub struct RainwayApp {
+        pub setup_id: String,
+        pub install_state: RainwayAppState,
+    }
+
+    pub fn get_rainway_key() -> Result<RainwayApp, BootstrapError> {
         let u_key = env!("RAINWAY_KEY");
 
         let key = match create_reg_key(RegistryHandle::CurrentUser, u_key) {
@@ -986,6 +1017,10 @@ pub mod updater {
 
         let app = RainwayApp {
             setup_id: key.get_value("SetupId").unwrap_or_default(),
+            install_state: RainwayAppState::from(
+                key.get_value::<u32, &str>("SetupState")
+                    .unwrap_or(RainwayAppState::Nothing as u32),
+            ),
         };
 
         Ok(app)
@@ -1005,6 +1040,22 @@ pub mod updater {
         match key.set_value(subkey, value) {
             Ok(_) => Ok(()),
             Err(e) => Err(BootstrapError::UnableToSetRegKey(u_key.to_string())),
+        }
+    }
+
+    pub fn post_deactivate(setup_id: String, version: String) {
+        let headers = ActiveUpdate::post_headers();
+
+        match post(
+            env!("DEACTIVATE_ENDPOINT"),
+            format!(r#"{{"uuid":"{}", "version": "{}"}}"#, setup_id, version,),
+            Some(ActiveUpdate::post_headers()),
+        ) {
+            Ok(s) => match s {
+                hyper::StatusCode::OK => log::debug!("Posted deactivate successfully"),
+                x => log::debug!("Failed to post {:?}", x),
+            },
+            x => log::debug!("Failed to post {:?}", x),
         }
     }
 }

@@ -17,7 +17,7 @@ prod_origin = "https://api-production.rainway.com/v2/installer/track/"
 install_endpoint = "installed"
 update_endpoint = "updated"
 activate_endpoint = "activated"
-# deactivate_endpoint = "https://api-dev.rainway.com/v2/installer/track/deactivated"
+deactivate_endpoint = "deactivated"
 api_origin = "https://download.rainway.com"
 
 
