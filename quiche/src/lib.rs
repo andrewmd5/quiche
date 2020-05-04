@@ -455,13 +455,13 @@ pub mod updater {
         fn store_installer_id(&mut self) {
             if let Some(id) = get_installer_id() {
                 match set_rainway_key_value("SetupId", &id) {
-                    Ok(_) => log::debug!("Set key successfully!"),
-                    Err(e) => log::debug!("Unable to set key {}", e),
+                    Ok(_) => log::warn!("Set key successfully!"),
+                    Err(e) => log::warn!("Unable to set key {}", e),
                 };
 
                 self.install_info.id = id;
             } else {
-                log::debug!("Could not find chief tags for setupid id")
+                log::warn!("Could not find chief tags for setupid id")
             }
         }
 
