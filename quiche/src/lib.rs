@@ -467,8 +467,8 @@ pub mod updater {
 
         pub fn store_event(new_state: RainwayAppState) {
             match set_rainway_key_value("SetupState", &(new_state as u32)) {
-                Ok(_) => log::debug!("Set install state successfully!"),
-                Err(e) => log::debug!("Unable to set install state {}", e),
+                Ok(_) => log::info!("Set install state successfully!"),
+                Err(e) => log::info!("Unable to set install state {}", e),
             };
         }
 
@@ -1026,20 +1026,22 @@ pub mod updater {
         Ok(app)
     }
 
-    fn set_rainway_key_value<N: AsRef<std::ffi::OsStr>, T: winreg::types::ToRegValue>(
-        subkey: N,
+    fn set_rainway_key_value<T: winreg::types::ToRegValue>(
+        subkey: &str,
         value: &T,
     ) -> Result<(), BootstrapError> {
         let u_key = env!("RAINWAY_KEY");
 
-        let key = match get_reg_key(RegistryHandle::CurrentUser, u_key) {
+        log::info!("Creating key {}", u_key);
+
+        let key = match create_reg_key(RegistryHandle::CurrentUser, u_key) {
             Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(u_key.to_string())),
             Ok(x) => x,
         };
 
         match key.set_value(subkey, value) {
             Ok(_) => Ok(()),
-            Err(e) => Err(BootstrapError::UnableToSetRegKey(u_key.to_string())),
+            Err(e) => Err(BootstrapError::UnableToSetRegKey(subkey.to_owned())),
         }
     }
 
@@ -1052,10 +1054,10 @@ pub mod updater {
             Some(ActiveUpdate::post_headers()),
         ) {
             Ok(s) => match s {
-                hyper::StatusCode::OK => log::debug!("Posted deactivate successfully"),
-                x => log::debug!("Failed to post {:?}", x),
+                hyper::StatusCode::OK => log::info!("Posted deactivate successfully"),
+                x => log::info!("Failed to post {:?}", x),
             },
-            x => log::debug!("Failed to post {:?}", x),
+            x => log::info!("Failed to post {:?}", x),
         }
     }
 }
