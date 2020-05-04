@@ -120,6 +120,7 @@ dependencies = [
  "fern 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "quiche 1.0.5",
+ "quote 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-embed 5.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "sentry 0.18.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "web-view 0.5.0 (git+https://github.com/RainwayApp/web-view.git)",
