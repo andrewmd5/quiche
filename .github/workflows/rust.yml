@@ -30,7 +30,7 @@ jobs:
         shell: cmd
       - uses: actions/upload-artifact@master
         with:
-          name: artifacts
+          name: artifacts-release
           path: bootstrapper_release/
 
   debug:
@@ -60,5 +60,5 @@ jobs:
         shell: cmd
       - uses: actions/upload-artifact@master
         with:
-          name: artifacts
+          name: artifacts-debug
           path: bootstrapper_debug/
