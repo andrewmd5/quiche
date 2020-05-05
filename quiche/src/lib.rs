@@ -558,13 +558,12 @@ pub mod updater {
         //     }
         // }
 
-        pub fn post_update(&self, old_version: &str) {
-            let new_version = &self.install_info.version;
+        pub fn post_update(&self, new_version: &str) {
             match post(
                 env!("UPDATE_ENDPOINT"),
                 format!(
                     r#"{{"uuid":"{}","version":"{}","lastVersion":"{}"}}"#,
-                    self.install_info.id, self.install_info.version, old_version
+                    self.install_info.id, new_version, self.install_info.version
                 ),
                 Some(ActiveUpdate::post_headers()),
             ) {
@@ -739,7 +738,6 @@ pub mod updater {
         download_path.push(update.get_temp_name());
         let mut update_staging_path = temp_dir();
         update_staging_path.push(format!("Rainway_Stage_{}", &update.get_version()));
-
         let current_exe = match std::env::current_exe() {
             Ok(exe) => get_filename(&exe),
             Err(e) => {
@@ -873,11 +871,10 @@ pub mod updater {
 
         log::info!("update went off without a hitch.");
 
-        let old_version = &update.install_info.version;
-
+     
         update.update_display_version();
 
-        update.post_update(old_version);
+        update.post_update(&update.get_version());
 
         Ok("Rainway updated!".to_string())
         //dir_contains_all_files(package_files, &install_path);
