@@ -315,6 +315,13 @@ pub fn get_reg_key(handle: RegistryHandle, key: &str) -> Result<RegKey, Bootstra
     }
 }
 
+pub fn delete_reg_key(handle: RegistryHandle, key: &str)  {
+    let hkey = RegKey::predef(handle as isize as HKEY);
+    if let Ok(_) = hkey.delete_subkey_all(&key) {
+        log::info!("Deleted key");
+    }
+}
+
 pub fn create_reg_key(handle: RegistryHandle, key: &str) -> Result<RegKey, BootstrapError> {
     let hkey = RegKey::predef(handle as isize as HKEY);
 

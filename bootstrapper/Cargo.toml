@@ -1,6 +1,6 @@
 [package]
 name = "bootstrapper"
-version = "2.0.0"
+version = "2.0.2"
 authors = ["Andrew Sampson <andrew@rainway.io>"]
 edition = "2018"
 

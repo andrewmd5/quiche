@@ -295,7 +295,7 @@ pub mod updater {
         grant_full_permissions, take_ownership_of_dir, unblock_file, unblock_path,
     };
     use crate::os::windows::{
-        create_reg_key, get_reg_key, get_uninstallers, set_uninstall_value, RegistryHandle,
+        create_reg_key, delete_reg_key, get_reg_key, get_uninstallers, set_uninstall_value, RegistryHandle,
     };
     use serde::{Deserialize, Serialize};
     use std::fs::{create_dir_all, remove_dir_all};
@@ -892,6 +892,13 @@ pub mod updater {
         let mut download_path = temp_dir();
         download_path.push(update.get_temp_name());
         log::info!("running {}", &download_path.display());
+
+        // Write the install id to registry
+        // along with what happened
+        update.store_installer_id();
+        update.post_install();
+        ActiveUpdate::store_event(RainwayAppState::Installed);
+
         let results = Command::new(download_path)
             .args(&["/qn"])
             .creation_flags(0x08000000)
@@ -908,13 +915,6 @@ pub mod updater {
             log::warn!("No output");
         }
 
-        // Write the install id to registry
-        // along with what happened
-
-        update.store_installer_id();
-        update.post_install();
-        ActiveUpdate::store_event(RainwayAppState::Activate);
-
         results
     }
 
@@ -929,7 +929,8 @@ pub mod updater {
 
     fn get_installer_id() -> Option<String> {
         use std::fs::File;
-        use std::io::{prelude::*, BufReader};
+        use regex::Regex;
+        use buffer_io::buffer::{BufferReader};
         let exe = match std::env::current_exe() {
             Ok(e) => e,
             Err(_) => return None,
@@ -937,66 +938,40 @@ pub mod updater {
 
         let setup = match File::open(exe) {
             Ok(f) => f,
-            Err(_) => return None,
+            Err(_) => return None,  
         };
 
-        fn find2(start: usize, haystack: &[u8], needle: &[u8]) -> Option<usize> {
-            (&haystack[start..])
-                .windows(needle.len())
-                .position(|window| window == needle)
-        }
-
-        let chief_bytes = &"<chief>".to_owned().into_bytes();
-        let end_chief_bytes = &"</chief>".to_owned().into_bytes();
-
-        let mut buffer = Vec::new();
-        let mut reader = BufReader::new(setup);
-
-        if let Ok(size) = reader.read_to_end(&mut buffer) {
-            let mut cur = 0 as usize;
-            while cur < buffer.len() {
-                let start = find2(cur, &buffer, chief_bytes);
-                let end = find2(cur, &buffer, end_chief_bytes);
-
-                match (start, end) {
-                    (Some(start), Some(end)) => {
-                        let start = start + cur;
-                        let end = end + cur;
-                        if end > start && end - start > chief_bytes.len() {
-                            let s = &buffer[start + chief_bytes.len()..end];
-                            if let Ok(s) = String::from_utf8(s.to_vec()) {
-                                return Some(s);
-                            }
-
-                            return None;
-                        } else {
-                            cur = end + 2;
-                            continue;
-                        }
-                    }
-
-                    _ => {
-                        return None;
+        let regex = Regex::new(r"<chief>([0-9a-fA-F]{8}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{4}\-[0-9a-fA-F]{12})</chief>").unwrap();
+        let mut reader = BufferReader::new(setup);
+        while let Ok(read_bytes) = reader.read_bytes(2048) {
+            let data = String::from_utf8_lossy(&read_bytes);
+            if let Some(captures) = regex.captures(&data) { 
+                if let Some(uuid) = captures.get(1) {
+                    if uuid.as_str().len() == 36 {
+                        return Some(uuid.as_str().to_string());
                     }
                 }
             }
         }
+        log::warn!("no UUID found");
         None
     }
 
     pub enum RainwayAppState {
         Nothing = 0,
-        Activate = 1,
-        Update = 2,
-        Deactivate = 3,
+        Installed = 1,
+        Activate = 2,
+        Update = 3,
+        Deactivate = 4,
     }
 
     impl From<u32> for RainwayAppState {
         fn from(x: u32) -> Self {
             match x {
-                1 => RainwayAppState::Activate,
-                2 => RainwayAppState::Update,
-                3 => RainwayAppState::Deactivate,
+                1 => RainwayAppState::Installed,
+                2 => RainwayAppState::Activate,
+                3 => RainwayAppState::Update,
+                4 => RainwayAppState::Deactivate,
                 _ => RainwayAppState::Nothing,
             }
         }
@@ -1007,6 +982,11 @@ pub mod updater {
         pub install_state: RainwayAppState,
     }
 
+    pub fn delete_rainway_key() {
+        let u_key = env!("RAINWAY_KEY");
+        delete_reg_key(RegistryHandle::CurrentUser, u_key)
+    }
+    
     pub fn get_rainway_key() -> Result<RainwayApp, BootstrapError> {
         let u_key = env!("RAINWAY_KEY");
 

@@ -34,5 +34,6 @@ winreg = "0.7.0"
 regex = "1"
 log = "0.4.8"
 fern = "0.6.0"
+buffer_io = "1"
 tokio = { version =  "0.2.14", features = ["fs"] }
 winapi = { version = "0.3.8", features = ["winuser", "tlhelp32", "handleapi", "restartmanager"] }
