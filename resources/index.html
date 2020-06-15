@@ -273,21 +273,21 @@
 
     <script type="text/javascript">
         //  @ts-check
-        let stepDots
-        let stepDashes
-        let stepLabels
-        let progressDescription
-        let progressDescriptionText
-        let progressDescriptionQuantify
-        let progressBarFilled
-        let progressBarScroller
-        let failureStateControls
-        let retryButton
-        let cancelButton
-        let curr
-        let downloadSize
-        let downloadVersion
-        const debug = false
+        let stepDots;
+        let stepDashes;
+        let stepLabels;
+        let progressDescription;
+        let progressDescriptionText;
+        let progressDescriptionQuantify;
+        let progressBarFilled;
+        let progressBarScroller;
+        let failureStateControls;
+        let retryButton;
+        let cancelButton;
+        let curr;
+        let downloadSize;
+        let downloadVersion;
+        const debug = false;
 
 
         /**
@@ -305,7 +305,7 @@
             installing: 'installing',
             finished: 'finished',
             invoke: 'invoke',
-        }
+        };
 
         /**
         @type {{
@@ -320,11 +320,11 @@
             'verifying': 1,
             'installing': 2,
             'finished': 3,
-        }
+        };
 
-        console.log = function (s) { window.external[slugs.invoke]("log|" + s) }
-        console.warn = function (s) { window.external[slugs.invoke]("log|" + s) }
-        console.error = function (s) { window.external[slugs.invoke]("log|" + s) }
+        console.log = function (s) { window.external[slugs.invoke]("log|" + s) };
+        console.warn = function (s) { window.external[slugs.invoke]("log|" + s) };
+        console.error = function (s) { window.external[slugs.invoke]("log|" + s) };
 
         function domReady(cb) {
             if (document.readyState === "loading") {
@@ -336,161 +336,161 @@
         }
 
         function init() {
-            stepDots = document.getElementsByClassName('step-dot')
-            stepLabels = document.getElementsByClassName('step-label')
-            stepDashes = document.getElementsByClassName('step-dash')
-            progressDescription = document.querySelector('.progress-wrapper')
-            progressDescriptionText = document.querySelector('.progress-description .text')
-            progressDescriptionQuantify = document.querySelector('.progress-description .quantify')
-            progressBarFilled = document.querySelector('.progress-bar .filled')
-            progressBarScroller = document.querySelector('.progress-bar .scroller')
-            failureStateControls = document.querySelector('.failure-controls-wrapper')
-            retryButton = document.querySelector('.failure-controls-wrapper .retry')
-            cancelButton = document.querySelector('.failure-controls-wrapper .cancel')
+            stepDots = document.getElementsByClassName('step-dot');
+            stepLabels = document.getElementsByClassName('step-label');
+            stepDashes = document.getElementsByClassName('step-dash');
+            progressDescription = document.querySelector('.progress-wrapper');
+            progressDescriptionText = document.querySelector('.progress-description .text');
+            progressDescriptionQuantify = document.querySelector('.progress-description .quantify');
+            progressBarFilled = document.querySelector('.progress-bar .filled');
+            progressBarScroller = document.querySelector('.progress-bar .scroller');
+            failureStateControls = document.querySelector('.failure-controls-wrapper');
+            retryButton = document.querySelector('.failure-controls-wrapper .retry');
+            cancelButton = document.querySelector('.failure-controls-wrapper .cancel');
 
-            retryButton.addEventListener('click', failureStateRetryCallback)
-            cancelButton.addEventListener('click', failureStateCancelCallback)
+            retryButton.addEventListener('click', failureStateRetryCallback);
+            cancelButton.addEventListener('click', failureStateCancelCallback);
 
             window.onerror = function(e) {
-                console.log(String(e))
+                console.log(String(e));
                 return true;
-            }
+            };
 
             if (debug) {
                 // mockSuccess()
-                mockFailure()
+                mockFailure();
             } else {
                 setTimeout(function() {
-                    setCurrentStep(slugs.downloading)
-                    external[slugs.invoke]('download')
-                }, 1000)
+                    setCurrentStep(slugs.downloading);
+                    external[slugs.invoke]('download');
+                }, 1000);
             }
         }
 
         function mockFailure() {
-            console.log('mocking Failure')
+            console.log('mocking Failure');
             setTimeout(function() {
-                setCurrentStep(slugs.downloading)
-                progressBarFilled.style.width = '50%'
-            }, 1000)
+                setCurrentStep(slugs.downloading);
+                progressBarFilled.style.width = '50%';
+            }, 1000);
             setTimeout(function() {
-                setCurrentStep(slugs.verifying)
-                progressBarFilled.style.width = '100%'
-                progressBarScroller.style.visiblity = 'visible'
-            }, 2000)
+                setCurrentStep(slugs.verifying);
+                progressBarFilled.style.width = '100%';
+                progressBarScroller.style.visiblity = 'visible';
+            }, 2000);
             setTimeout(function() {
-                setFailureState(slugs.verifying)
-            }, 3000)
+                setFailureState(slugs.verifying);
+            }, 3000);
         }
 
         function mockSuccess() {
-            console.log('mocking Success')
+            console.log('mocking Success');
             setTimeout(function() {
-                setCurrentStep(slugs.downloading)
-                progressBarFilled.style.width = '50%'
-            }, 1000)
+                setCurrentStep(slugs.downloading);
+                progressBarFilled.style.width = '50%';
+            }, 1000);
             setTimeout(function() {
-                setCurrentStep(slugs.verifying)
-                progressBarFilled.style.width = '100%'
-                progressBarScroller.style.visibility = 'visible'
-            }, 2000)
+                setCurrentStep(slugs.verifying);
+                progressBarFilled.style.width = '100%';
+                progressBarScroller.style.visibility = 'visible';
+            }, 2000);
             setTimeout(function() {
-                setCurrentStep(slugs.installing)
-            }, 3000)
+                setCurrentStep(slugs.installing);
+            }, 3000);
             setTimeout(function() {
-                setCurrentStep(slugs.finished)
-            }, 4000)
+                setCurrentStep(slugs.finished);
+            }, 4000);
         }
 
         function setCurrentStep(next) {
-            console.log('currentStep', next)
-            curr = next
-            const currIndex = steps[curr]
-            const lastIndex = currIndex - 1
+            console.log('currentStep', next);
+            curr = next;
+            const currIndex = steps[curr];
+            const lastIndex = currIndex - 1;
 
             if (curr !== slugs.downloading) {
-                stepDots[lastIndex].classList.remove('step-dot--active')
-                stepDots[lastIndex].classList.add('step-dot--complete')
-                stepDashes[lastIndex].classList.add('step-dash--complete')
-                stepLabels[lastIndex].classList.add('step-label--complete')
+                stepDots[lastIndex].classList.remove('step-dot--active');
+                stepDots[lastIndex].classList.add('step-dot--complete');
+                stepDashes[lastIndex].classList.add('step-dash--complete');
+                stepLabels[lastIndex].classList.add('step-label--complete');
             }
 
-            stepDots[currIndex].classList.add('step-dot--active')
-            stepLabels[currIndex].classList.add('step-label--active')
+            stepDots[currIndex].classList.add('step-dot--active');
+            stepLabels[currIndex].classList.add('step-label--active');
         }
 
         function setFailureState(step) {
-            const capitalized = step.split('')[0].toUpperCase() + step.slice(1)
-            const currIndex = steps[step]
+            const capitalized = step.split('')[0].toUpperCase() + step.slice(1);
+            const currIndex = steps[step];
 
-            stepDots[currIndex].classList.add('step-dot--failed')
-            currIndex > 0 && stepDashes[currIndex - 1].classList.add('step-dash--failed')
-            progressBarFilled.classList.add('filled--failed')
-            progressBarScroller.style.animation = undefined
-            progressDescriptionText.innerHTML = capitalized + ' failed...'
-            progressDescriptionQuantify.style.display = 'none'
-            failureStateControls.style.display = 'block'
+            stepDots[currIndex].classList.add('step-dot--failed');
+            currIndex > 0 && stepDashes[currIndex - 1].classList.add('step-dash--failed');
+            progressBarFilled.classList.add('filled--failed');
+            progressBarScroller.style.animation = undefined;
+            progressDescriptionText.innerHTML = capitalized + ' failed...';
+            progressDescriptionQuantify.style.display = 'none';
+            failureStateControls.style.display = 'block';
         }
 
-        domReady(init.bind(this))
+        domReady(init.bind(this));
 
         function downloadProgress(v, total, downloaded) {
-            if (!downloadSize) downloadSize = Math.ceil(total / 1e6)
-            if (!downloadVersion) downloadVersion = v
-            progressDescriptionText.innerHTML = 'Downloading Dashboard v' + downloadVersion
-            progressDescriptionQuantify.innerHTML = (downloaded / 1e6).toFixed(1) + ' / ' + downloadSize + ' MB'
-            const percent = Math.max((downloaded / total) * 100, 2)
-            progressBarFilled.style.width = ''+percent+'%'
+            if (!downloadSize) downloadSize = Math.ceil(total / 1e6);
+            if (!downloadVersion) downloadVersion = v;
+            progressDescriptionText.innerHTML = 'Downloading Dashboard v' + downloadVersion;
+            progressDescriptionQuantify.innerHTML = (downloaded / 1e6).toFixed(1) + ' / ' + downloadSize + ' MB';
+            const percent = Math.max((downloaded / total) * 100, 2);
+            progressBarFilled.style.width = ''+percent+'%';
         }
 
         function downloadFailed(e) {
-            console.log('download failed: ' + e)
-            setFailureState(slugs.downloading)
+            console.log('download failed: ' + e);
+            setFailureState(slugs.downloading);
         }
 
         function downloadComplete(e) {
-            progressBarFilled.style.width = '100%'
-            progressDescriptionQuantify.style.display = 'none'
-            progressDescriptionText.innerHTML = 'Verifying Dashboard v' + downloadVersion
-            progressBarScroller.style.visibility = 'visible'
+            progressBarFilled.style.width = '100%';
+            progressDescriptionQuantify.style.display = 'none';
+            progressDescriptionText.innerHTML = 'Verifying Dashboard v' + downloadVersion;
+            progressBarScroller.style.visibility = 'visible';
 
-            setCurrentStep.call(this, slugs.verifying)
-            external[slugs.invoke]('verify')
+            setCurrentStep.call(this, slugs.verifying);
+            external[slugs.invoke]('verify');
         }
 
         function verificationComplete(e) {
-            setCurrentStep.call(this, slugs.installing)
-            external[slugs.invoke]('apply')
-            progressDescriptionText.innerHTML = 'Installing Dashboard v' + downloadVersion
+            setCurrentStep.call(this, slugs.installing);
+            external[slugs.invoke]('apply');
+            progressDescriptionText.innerHTML = 'Installing Dashboard v' + downloadVersion;
         }
 
         function verificationFailed(e) {
-            console.log('verification failed: ' + e)
-            setFailureState('verification')
+            console.log('verification failed: ' + e);
+            setFailureState('verification');
         }
 
         function updateComplete(e) {
-            console.log(e)
-            setCurrentStep.call(this, slugs.finished)
+            console.log(e);
+            setCurrentStep.call(this, slugs.finished);
             progressDescriptionText.innerHTML = 'Dashboard v' + downloadVersion + ' installed!';
-            external[slugs.invoke]('launch')
+            external[slugs.invoke]('launch');
         }
 
         function updateFailed(e) {
-            console.error('update failed: ' + e)
-            setFailureState('updating')
+            console.error('update failed: ' + e);
+            setFailureState('updating');
         }
 
         function failureStateCancelCallback(e) {
-            e.preventDefault()
-            console.log('cancel callback')
+            e.preventDefault();
+            console.log('cancel callback');
             // external cancel call here
         }
 
         function failureStateRetryCallback(e) {
-            e.preventDefault()
-            external[slugs.invoke]('retry')
-            console.log('retry callback')
+            e.preventDefault();
+            external[slugs.invoke]('retry');
+            console.log('retry callback');
             // external retry call here
         }
     </script>
