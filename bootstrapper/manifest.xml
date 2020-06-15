@@ -1,4 +1,6 @@
-<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
+  <assemblyIdentity version="1.0.0.0" name="Quiche.app" />
   <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
     <application>
       <!-- Windows Vista -->
@@ -11,17 +13,19 @@
       <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}"/>
       <!-- Windows 10.0 -->
       <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/>
-       <windowsSettings>
-        <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
-        <dpiAware>true</dpiAware>
-    </windowsSettings>
     </application>
   </compatibility>
-  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
-      <requestedPrivileges>
-            <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
-        </requestedPrivileges>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+      </requestedPrivileges>
     </security>
   </trustInfo>
+  <asmv3:application>
+    <asmv3:windowsSettings xmlns:ws3="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
+      <ws3:dpiAwareness>PerMonitorV2, PerMonitor</ws3:dpiAwareness>
+      <ws3:longPathAware>true</ws3:longPathAware>
+    </asmv3:windowsSettings>
+  </asmv3:application>
 </assembly>

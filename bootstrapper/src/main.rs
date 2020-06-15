@@ -16,7 +16,6 @@ use quiche::updater::{is_installed, ActiveUpdate, UpdateType};
 use rust_embed::RustEmbed;
 use ui::messagebox::{show_error, show_error_with_url};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
-use ui::window::set_dpi_aware;
 use web_view::{Content, Icon, WVResult, WebView};
 #[derive(RustEmbed)]
 #[folder = "$CARGO_MANIFEST_DIR\\..\\resources"]
@@ -135,17 +134,15 @@ fn run() -> Result<(), BootstrapError> {
         log::warn!("the current Rainway installation requires an update.");
     }
 
-    set_dpi_aware();
-
     let resources = load_resources()?;
 
     let mut webview = match web_view::builder()
-        .title("Rainway Boostrapper")
+        .title("Rainway Setup")
         .content(Content::Html(resources.html))
         .size(600, 380)
         .debug(true)
         .user_data(0)
-        .borderless(true)
+        .frameless(true)
         .resizable(false)
         .invoke_handler(|_webview, arg| handler(_webview, arg, &update))
         .build()

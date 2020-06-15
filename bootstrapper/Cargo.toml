@@ -20,10 +20,10 @@ service_name = "RainwayRadar"
 winres = "0.1"
 
 [dependencies]
-#web-view = { path = "E:/Dev/Rainway/web-view" }
+#web-view = { path = "C:/Users/Andrew/web-view" }
 web-view = { git = "https://github.com/RainwayApp/web-view.git" }
 quiche = { path = "../quiche" }
-rust-embed  = { version = "5.5.1", features = ["interpolate-folder-path"] }
+rust-embed  = { version = "5.5.1", features = ["interpolate-folder-path", "debug-embed"] }
 sentry = { version = "0.18.0", features = ["with_device_info", "with_panic", "with_rust_info", "with_backtrace"] } 
 winapi = { version = "0.3.8", features = ["winuser", "combaseapi", "objbase", "shellapi"] }
 log = "0.4.8"

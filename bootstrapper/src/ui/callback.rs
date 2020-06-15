@@ -45,8 +45,10 @@ fn escape_string(arg: String) -> String {
 
 /// Formats a callback in to a javascript function call
 pub fn format_callback(function_name: String, arg: String) -> String {
+    log::info!("Formatting callback: \"{}({})\"", function_name, arg);
     let escaped_arg = escape_string(arg);
     let formatted_string = &format!("{}({})", function_name, escaped_arg);
+   
     return formatted_string.to_string();
 }
 
