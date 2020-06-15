@@ -2,7 +2,7 @@ use crate::ui::messagebox::show_error;
 use quiche::etc::constants::BootstrapError;
 use quiche::os::process::get_processes;
 use quiche::os::service::{install_service, service_exist, start_service, WindowsService};
-use quiche::os::windows::{detach_rdp_session, get_dotnet_framework_version, get_system_info};
+use quiche::os::windows::{detach_rdp_session, get_dotnet_framework_version, get_system_info, WindowsVersion};
 use std::path::PathBuf;
 use std::process;
 /// returns an error if the bootstrapper is already open
@@ -85,7 +85,7 @@ pub fn check_system_compatibility() -> Result<(), BootstrapError> {
         return Err(BootstrapError::ArchitectureUnsupported);
     }
 
-    if !system_info.is_supported {
+    if system_info.windows_version != WindowsVersion::Windows10 {
         log::error!("{} is unsupported", system_info.product_name);
         return Err(BootstrapError::WindowsVersionUnsupported);
     }

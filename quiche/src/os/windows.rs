@@ -11,7 +11,11 @@ use winreg::enums::KEY_ALL_ACCESS;
 use winreg::types::ToRegValue;
 use winreg::RegKey;
 use winreg::HKEY;
-
+use crate::os::winver::{
+    is_windows10_or_greater, is_windows7_or_greater, is_windows8_or_greater,
+    is_windows8_point1_or_greater, is_windows_server, is_windows_vista_or_greater,
+    is_windows_xpor_greater,
+};
 /// dism.exe will return exit code 740 if it is launched
 /// from a non-elevated process.
 static ELEVATION_REQUIRED: i32 = 740;
@@ -20,7 +24,7 @@ static ELEVATION_REQUIRED: i32 = 740;
 /// Contains system information that was retreived from ```system::get_system_info()```
 pub struct SystemInfo {
     /// Rainway is only supported on Windows 10, Server 2016, and Server 2019.
-    pub is_supported: bool,
+    pub windows_version: WindowsVersion,
     /// Windows N and KN lack required codecs by default. If this is true ```system::needs_media_pack()```
     /// should be called.
     pub is_n_edition: bool,
@@ -89,31 +93,27 @@ pub fn get_system_info() -> Result<SystemInfo, BootstrapError> {
         Ok(p) => p,
     };
     system_info.is_n_edition = re.is_match(&system_info.product_name);
-    //this key will be missing on any non-Windows 10, Windows Server 2016 & 2019.
-    let current_major_version_number: u32 = match cur_ver.get_value("CurrentMajorVersionNumber") {
-        Err(_error) => 0,
-        Ok(p) => p,
-    };
     //We only support the above mentioned operating systems.
-    system_info.is_supported = current_major_version_number == 10;
-    system_info.is_x64 = is_x64()?;
+    system_info.windows_version = match get_windows_version() {
+        Ok(v) => v,
+        Err(e) => return Err(e)
+    };
+   // if current_major_version_number == 10;
+    system_info.is_x64 = is_x64();
     Ok(system_info)
 }
 
+
 /// Parses the registry to determine if the host OS is x32 or x64.
-fn is_x64() -> Result<bool, BootstrapError> {
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let env = "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment";
-    let environment = match hklm.open_subkey(env) {
-        Err(_e) => return Err(BootstrapError::RegistryKeyNotFound(env.to_string())),
-        Ok(o) => o,
-    };
-    let arch_key = "PROCESSOR_ARCHITECTURE";
-    let processor_architecture: String = match environment.get_value(arch_key) {
-        Ok(v) => v,
-        Err(_error) => return Err(BootstrapError::RegistryValueNotFound(arch_key.to_string())),
-    };
-    Ok(processor_architecture == "AMD64")
+fn is_x64() -> bool {
+    use winapi::um::sysinfoapi;
+    let mut out: sysinfoapi::SYSTEM_INFO = unsafe { std::mem::MaybeUninit::zeroed().assume_init() };
+    unsafe { sysinfoapi::GetNativeSystemInfo(&mut out as sysinfoapi::LPSYSTEM_INFO) };
+    match unsafe { out.u.s() }.wProcessorArchitecture {
+        //x64 (AMD or Intel)
+        winapi::um::winnt::PROCESSOR_ARCHITECTURE_AMD64 => true,
+        _ => false,
+    }
 }
 
 /// Determines if Windows N/KN users have the Media Feature Pack installed.
@@ -331,5 +331,38 @@ pub fn create_reg_key(handle: RegistryHandle, key: &str) -> Result<RegKey, Boots
             Ok((u, _)) => Ok(u),
             Err(_e) => Err(BootstrapError::RegistryKeyNotFound(key.to_string())),
         },
+    }
+}
+
+pub fn get_windows_version() -> Result<WindowsVersion, BootstrapError> {
+    if is_windows10_or_greater() {
+        Ok(WindowsVersion::Windows10)
+    } else if is_windows8_point1_or_greater() {
+        Ok(WindowsVersion::Windows81)
+    } else if is_windows8_or_greater() {
+        Ok(WindowsVersion::Windows8)
+    } else if is_windows7_or_greater() {
+        Ok(WindowsVersion::Windows7)
+    } else if is_windows_vista_or_greater() {
+        Ok(WindowsVersion::WindowsVista)
+    } else if is_windows_xpor_greater() {
+        Ok(WindowsVersion::WindowsXp)
+    } else {
+        Err(BootstrapError::OsVersionNotFound)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub enum WindowsVersion {
+    WindowsXp = 0,
+    WindowsVista = 1,
+    Windows7 = 2,
+    Windows8 = 3,
+    Windows81 = 4,
+    Windows10 = 5,
+}
+impl Default for WindowsVersion {
+    fn default() -> Self {
+        WindowsVersion::WindowsXp
     }
 }
