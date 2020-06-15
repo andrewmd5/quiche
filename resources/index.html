@@ -1,8 +1,7 @@
-<!doctype html>
-<html>
-
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
     <style>
         @font-face {
             font-family: 'Lato';
@@ -272,227 +271,637 @@
     </style>
 
     <script type="text/javascript">
-        //  @ts-check
-        let stepDots;
-        let stepDashes;
-        let stepLabels;
-        let progressDescription;
-        let progressDescriptionText;
-        let progressDescriptionQuantify;
-        let progressBarFilled;
-        let progressBarScroller;
-        let failureStateControls;
-        let retryButton;
-        let cancelButton;
-        let curr;
-        let downloadSize;
-        let downloadVersion;
-        const debug = false;
-
 
         /**
-        @type {{
-            downloading: string,
-            verifying: string,
-            installing: string,
-            finished: string,
-            invoke: string,
-        }}
-        **/
-        const slugs = {
-            downloading: 'downloading',
-            verifying: 'verifying',
-            installing: 'installing',
-            finished: 'finished',
-            invoke: 'invoke',
-        };
+         * Protect window.console method calls, e.g. console is not defined on IE
+         * unless dev tools are open, and IE doesn't define console.debug
+         * 
+         * Chrome 41.0.2272.118: debug,error,info,log,warn,dir,dirxml,table,trace,assert,count,markTimeline,profile,profileEnd,time,timeEnd,timeStamp,timeline,timelineEnd,group,groupCollapsed,groupEnd,clear
+         * Firefox 37.0.1: log,info,warn,error,exception,debug,table,trace,dir,group,groupCollapsed,groupEnd,time,timeEnd,profile,profileEnd,assert,count
+         * Internet Explorer 11: select,log,info,warn,error,debug,assert,time,timeEnd,timeStamp,group,groupCollapsed,groupEnd,trace,clear,dir,dirxml,count,countReset,cd
+         * Safari 6.2.4: debug,error,log,info,warn,clear,dir,dirxml,table,trace,assert,count,profile,profileEnd,time,timeEnd,timeStamp,group,groupCollapsed,groupEnd
+         * Opera 28.0.1750.48: debug,error,info,log,warn,dir,dirxml,table,trace,assert,count,markTimeline,profile,profileEnd,time,timeEnd,timeStamp,timeline,timelineEnd,group,groupCollapsed,groupEnd,clear
+         */
+            (function () {
+                // Union of Chrome, Firefox, IE, Opera, and Safari console methods
+                var methods = ["assert", "cd", "clear", "count", "countReset",
+                    "debug", "dir", "dirxml", "error", "exception", "group", "groupCollapsed",
+                    "groupEnd", "info", "log", "markTimeline", "profile", "profileEnd",
+                    "select", "table", "time", "timeEnd", "timeStamp", "timeline",
+                    "timelineEnd", "trace", "warn"];
+                var length = methods.length;
+                var console = (window.console = window.console || {});
+                var method;
+                var noop = function () { };
+                while (length--) {
+                    method = methods[length];
+                    // define undefined methods as noops to prevent errors
+                    if (!console[method])
+                        console[method] = noop;
+                }
+            })();
 
-        /**
-        @type {{
-            downloading: number,
-            verifying: number,
-            installing: number,
-            finished: number,
-        }}
-        **/
-        const steps = {
-            'downloading': 0,
-            'verifying': 1,
-            'installing': 2,
-            'finished': 3,
-        };
+            (function () {
+                if (!Event.prototype.preventDefault) {
+                    Event.prototype.preventDefault = function () {
+                        this.returnValue = false;
+                    };
+                }
+                if (!Event.prototype.stopPropagation) {
+                    Event.prototype.stopPropagation = function () {
+                        this.cancelBubble = true;
+                    };
+                }
+                if (!Element.prototype.addEventListener) {
+                    var eventListeners = [];
 
-        console.log = function (s) { window.external[slugs.invoke]("log|" + s) };
-        console.warn = function (s) { window.external[slugs.invoke]("log|" + s) };
-        console.error = function (s) { window.external[slugs.invoke]("log|" + s) };
+                    var addEventListener = function (type, listener /*, useCapture (will be ignored) */) {
+                        var self = this;
+                        var wrapper = function (e) {
+                            e.target = e.srcElement;
+                            e.currentTarget = self;
+                            if (listener.handleEvent) {
+                                listener.handleEvent(e);
+                            } else {
+                                listener.call(self, e);
+                            }
+                        };
+                        if (type == "DOMContentLoaded") {
+                            var wrapper2 = function (e) {
+                                if (document.readyState == "complete") {
+                                    wrapper(e);
+                                }
+                            };
+                            document.attachEvent("onreadystatechange", wrapper2);
+                            eventListeners.push({ object: this, type: type, listener: listener, wrapper: wrapper2 });
 
-        function domReady(cb) {
-            if (document.readyState === "loading") {
-                document.addEventListener('DOMContentLoaded', cb);
+                            if (document.readyState == "complete") {
+                                var e = new Event();
+                                e.srcElement = window;
+                                wrapper2(e);
+                            }
+                        } else {
+                            this.attachEvent("on" + type, wrapper);
+                            eventListeners.push({ object: this, type: type, listener: listener, wrapper: wrapper });
+                        }
+                    };
+                    var removeEventListener = function (type, listener /*, useCapture (will be ignored) */) {
+                        var counter = 0;
+                        while (counter < eventListeners.length) {
+                            var eventListener = eventListeners[counter];
+                            if (eventListener.object == this && eventListener.type == type && eventListener.listener == listener) {
+                                if (type == "DOMContentLoaded") {
+                                    this.detachEvent("onreadystatechange", eventListener.wrapper);
+                                } else {
+                                    this.detachEvent("on" + type, eventListener.wrapper);
+                                }
+                                break;
+                            }
+                            ++counter;
+                        }
+                    };
+                    Element.prototype.addEventListener = addEventListener;
+                    Element.prototype.removeEventListener = removeEventListener;
+                    if (HTMLDocument) {
+                        HTMLDocument.prototype.addEventListener = addEventListener;
+                        HTMLDocument.prototype.removeEventListener = removeEventListener;
+                    }
+                    if (Window) {
+                        Window.prototype.addEventListener = addEventListener;
+                        Window.prototype.removeEventListener = removeEventListener;
+                    }
+                }
+            })();
+            //  Yes, it does work with `new funcA.bind(thisArg, args)`
+            if (!Function.prototype.bind) (function () {
+                var ArrayPrototypeSlice = Array.prototype.slice;
+                Function.prototype.bind = function (otherThis) {
+                    if (typeof this !== 'function') {
+                        // closest thing possible to the ECMAScript 5
+                        // internal IsCallable function
+                        throw new TypeError('Function.prototype.bind - what is trying to be bound is not callable');
+                    }
+
+                    var baseArgs = ArrayPrototypeSlice.call(arguments, 1),
+                        baseArgsLength = baseArgs.length,
+                        fToBind = this,
+                        fNOP = function () { },
+                        fBound = function () {
+                            baseArgs.length = baseArgsLength; // reset to default base arguments
+                            baseArgs.push.apply(baseArgs, arguments);
+                            return fToBind.apply(
+                                fNOP.prototype.isPrototypeOf(this) ? this : otherThis, baseArgs
+                            );
+                        };
+
+                    if (this.prototype) {
+                        // Function.prototype doesn't have a prototype property
+                        fNOP.prototype = this.prototype;
+                    }
+                    fBound.prototype = new fNOP();
+
+                    return fBound;
+                };
+            })();
+
+            if (!document.getElementsByClassName) {
+                document.getElementsByClassName = function (search) {
+                    var d = document, elements, pattern, i, results = [];
+                    if (d.querySelectorAll) { // IE8
+                        return d.querySelectorAll("." + search);
+                    }
+                    if (d.evaluate) { // IE6, IE7
+                        pattern = ".//*[contains(concat(' ', @class, ' '), ' " + search + " ')]";
+                        elements = d.evaluate(pattern, d, null, 0, null);
+                        while ((i = elements.iterateNext())) {
+                            results.push(i);
+                        }
+                    } else {
+                        elements = d.getElementsByTagName("*");
+                        pattern = new RegExp("(^|\\s)" + search + "(\\s|$)");
+                        for (i = 0; i < elements.length; i++) {
+                            if (pattern.test(elements[i].className)) {
+                                results.push(elements[i]);
+                            }
+                        }
+                    }
+                    return results;
+                }
             }
-            else {
-                cb;
+
+            if ("document" in self) {
+
+                // Full polyfill for browsers with no classList support
+                // Including IE < Edge missing SVGElement.classList
+                if (
+                    !("classList" in document.createElement("_"))
+                    || document.createElementNS
+                    && !("classList" in document.createElementNS("http://www.w3.org/2000/svg", "g"))
+                ) {
+
+                    (function (view) {
+
+                        "use strict";
+
+                        if (!('Element' in view)) return;
+
+                        var
+                            classListProp = "classList"
+                            , protoProp = "prototype"
+                            , elemCtrProto = view.Element[protoProp]
+                            , objCtr = Object
+                            , strTrim = String[protoProp].trim || function () {
+                                return this.replace(/^\s+|\s+$/g, "");
+                            }
+                            , arrIndexOf = Array[protoProp].indexOf || function (item) {
+                                var
+                                    i = 0
+                                    , len = this.length
+                                    ;
+                                for (; i < len; i++) {
+                                    if (i in this && this[i] === item) {
+                                        return i;
+                                    }
+                                }
+                                return -1;
+                            }
+                            // Vendors: please allow content code to instantiate DOMExceptions
+                            , DOMEx = function (type, message) {
+                                this.name = type;
+                                this.code = DOMException[type];
+                                this.message = message;
+                            }
+                            , checkTokenAndGetIndex = function (classList, token) {
+                                if (token === "") {
+                                    throw new DOMEx(
+                                        "SYNTAX_ERR"
+                                        , "The token must not be empty."
+                                    );
+                                }
+                                if (/\s/.test(token)) {
+                                    throw new DOMEx(
+                                        "INVALID_CHARACTER_ERR"
+                                        , "The token must not contain space characters."
+                                    );
+                                }
+                                return arrIndexOf.call(classList, token);
+                            }
+                            , ClassList = function (elem) {
+                                var
+                                    trimmedClasses = strTrim.call(elem.getAttribute("class") || "")
+                                    , classes = trimmedClasses ? trimmedClasses.split(/\s+/) : []
+                                    , i = 0
+                                    , len = classes.length
+                                    ;
+                                for (; i < len; i++) {
+                                    this.push(classes[i]);
+                                }
+                                this._updateClassName = function () {
+                                    elem.setAttribute("class", this.toString());
+                                };
+                            }
+                            , classListProto = ClassList[protoProp] = []
+                            , classListGetter = function () {
+                                return new ClassList(this);
+                            }
+                            ;
+                        // Most DOMException implementations don't allow calling DOMException's toString()
+                        // on non-DOMExceptions. Error's toString() is sufficient here.
+                        DOMEx[protoProp] = Error[protoProp];
+                        classListProto.item = function (i) {
+                            return this[i] || null;
+                        };
+                        classListProto.contains = function (token) {
+                            return ~checkTokenAndGetIndex(this, token + "");
+                        };
+                        classListProto.add = function () {
+                            var
+                                tokens = arguments
+                                , i = 0
+                                , l = tokens.length
+                                , token
+                                , updated = false
+                                ;
+                            do {
+                                token = tokens[i] + "";
+                                if (!~checkTokenAndGetIndex(this, token)) {
+                                    this.push(token);
+                                    updated = true;
+                                }
+                            }
+                            while (++i < l);
+
+                            if (updated) {
+                                this._updateClassName();
+                            }
+                        };
+                        classListProto.remove = function () {
+                            var
+                                tokens = arguments
+                                , i = 0
+                                , l = tokens.length
+                                , token
+                                , updated = false
+                                , index
+                                ;
+                            do {
+                                token = tokens[i] + "";
+                                index = checkTokenAndGetIndex(this, token);
+                                while (~index) {
+                                    this.splice(index, 1);
+                                    updated = true;
+                                    index = checkTokenAndGetIndex(this, token);
+                                }
+                            }
+                            while (++i < l);
+
+                            if (updated) {
+                                this._updateClassName();
+                            }
+                        };
+                        classListProto.toggle = function (token, force) {
+                            var
+                                result = this.contains(token)
+                                , method = result ?
+                                    force !== true && "remove"
+                                    :
+                                    force !== false && "add"
+                                ;
+
+                            if (method) {
+                                this[method](token);
+                            }
+
+                            if (force === true || force === false) {
+                                return force;
+                            } else {
+                                return !result;
+                            }
+                        };
+                        classListProto.replace = function (token, replacement_token) {
+                            var index = checkTokenAndGetIndex(token + "");
+                            if (~index) {
+                                this.splice(index, 1, replacement_token);
+                                this._updateClassName();
+                            }
+                        }
+                        classListProto.toString = function () {
+                            return this.join(" ");
+                        };
+
+                        if (objCtr.defineProperty) {
+                            var classListPropDesc = {
+                                get: classListGetter
+                                , enumerable: true
+                                , configurable: true
+                            };
+                            try {
+                                objCtr.defineProperty(elemCtrProto, classListProp, classListPropDesc);
+                            } catch (ex) { // IE 8 doesn't support enumerable:true
+                                // adding undefined to fight this issue https://github.com/eligrey/classList.js/issues/36
+                                // modernie IE8-MSW7 machine has IE8 8.0.6001.18702 and is affected
+                                if (ex.number === undefined || ex.number === -0x7FF5EC54) {
+                                    classListPropDesc.enumerable = false;
+                                    objCtr.defineProperty(elemCtrProto, classListProp, classListPropDesc);
+                                }
+                            }
+                        } else if (objCtr[protoProp].__defineGetter__) {
+                            elemCtrProto.__defineGetter__(classListProp, classListGetter);
+                        }
+
+                    }(self));
+
+                }
+
+                // There is full or partial native classList support, so just check if we need
+                // to normalize the add/remove and toggle APIs.
+
+                (function () {
+                    "use strict";
+
+                    var testElement = document.createElement("_");
+
+                    testElement.classList.add("c1", "c2");
+
+                    // Polyfill for IE 10/11 and Firefox <26, where classList.add and
+                    // classList.remove exist but support only one argument at a time.
+                    if (!testElement.classList.contains("c2")) {
+                        var createMethod = function (method) {
+                            var original = DOMTokenList.prototype[method];
+
+                            DOMTokenList.prototype[method] = function (token) {
+                                var i, len = arguments.length;
+
+                                for (i = 0; i < len; i++) {
+                                    token = arguments[i];
+                                    original.call(this, token);
+                                }
+                            };
+                        };
+                        createMethod('add');
+                        createMethod('remove');
+                    }
+
+                    testElement.classList.toggle("c3", false);
+
+                    // Polyfill for IE 10 and Firefox <24, where classList.toggle does not
+                    // support the second argument.
+                    if (testElement.classList.contains("c3")) {
+                        var _toggle = DOMTokenList.prototype.toggle;
+
+                        DOMTokenList.prototype.toggle = function (token, force) {
+                            if (1 in arguments && !this.contains(token) === !force) {
+                                return force;
+                            } else {
+                                return _toggle.call(this, token);
+                            }
+                        };
+
+                    }
+
+                    // replace() polyfill
+                    if (!("replace" in document.createElement("_").classList)) {
+                        DOMTokenList.prototype.replace = function (token, replacement_token) {
+                            var
+                                tokens = this.toString().split(" ")
+                                , index = tokens.indexOf(token + "")
+                                ;
+                            if (~index) {
+                                tokens = tokens.slice(index);
+                                this.remove.apply(this, tokens);
+                                this.add(replacement_token);
+                                this.add.apply(this, tokens.slice(1));
+                            }
+                        }
+                    }
+
+                    testElement = null;
+                }());
+
             }
-        }
+            //  @ts-check
+            var stepDots;
+            var stepDashes;
+            var stepLabels;
+            var progressDescription;
+            var progressDescriptionText;
+            var progressDescriptionQuantify;
+            var progressBarFilled;
+            var progressBarScroller;
+            var failureStateControls;
+            var retryButton;
+            var cancelButton;
+            var curr;
+            var downloadSize;
+            var downloadVersion;
+            var debug = false;
 
-        function init() {
-            stepDots = document.getElementsByClassName('step-dot');
-            stepLabels = document.getElementsByClassName('step-label');
-            stepDashes = document.getElementsByClassName('step-dash');
-            progressDescription = document.querySelector('.progress-wrapper');
-            progressDescriptionText = document.querySelector('.progress-description .text');
-            progressDescriptionQuantify = document.querySelector('.progress-description .quantify');
-            progressBarFilled = document.querySelector('.progress-bar .filled');
-            progressBarScroller = document.querySelector('.progress-bar .scroller');
-            failureStateControls = document.querySelector('.failure-controls-wrapper');
-            retryButton = document.querySelector('.failure-controls-wrapper .retry');
-            cancelButton = document.querySelector('.failure-controls-wrapper .cancel');
 
-            retryButton.addEventListener('click', failureStateRetryCallback);
-            cancelButton.addEventListener('click', failureStateCancelCallback);
-
-            window.onerror = function(e) {
-                console.log(String(e));
-                return true;
+            /**
+            @type {{
+                downloading: string,
+                verifying: string,
+                installing: string,
+                finished: string,
+                invoke: string,
+            }}
+            **/
+            var slugs = {
+                downloading: 'downloading',
+                verifying: 'verifying',
+                installing: 'installing',
+                finished: 'finished',
+                invoke: 'invoke',
             };
 
-            if (debug) {
-                // mockSuccess()
-                mockFailure();
-            } else {
-                setTimeout(function() {
+            /**
+            @type {{
+                downloading: number,
+                verifying: number,
+                installing: number,
+                finished: number,
+            }}
+            **/
+            var steps = {
+                'downloading': 0,
+                'verifying': 1,
+                'installing': 2,
+                'finished': 3,
+            };
+
+            console.log = function (s) { window.external[slugs.invoke]("log|" + s); };
+            console.warn = function (s) { window.external[slugs.invoke]("log|" + s); };
+            console.error = function (s) { window.external[slugs.invoke]("log|" + s); };
+
+            function domReady(cb) {
+                if (document.readyState === "loading") {
+                    document.addEventListener('DOMContentLoaded', cb);
+                }
+                else {
+                    cb();
+                }
+            }
+
+            function init() {
+                stepDots = document.getElementsByClassName('step-dot');
+                stepLabels = document.getElementsByClassName('step-label');
+                stepDashes = document.getElementsByClassName('step-dash');
+                progressDescription = document.querySelector('.progress-wrapper');
+                progressDescriptionText = document.querySelector('.progress-description .text');
+                progressDescriptionQuantify = document.querySelector('.progress-description .quantify');
+                progressBarFilled = document.querySelector('.progress-bar .filled');
+                progressBarScroller = document.querySelector('.progress-bar .scroller');
+                failureStateControls = document.querySelector('.failure-controls-wrapper');
+                retryButton = document.querySelector('.failure-controls-wrapper .retry');
+                cancelButton = document.querySelector('.failure-controls-wrapper .cancel');
+
+                retryButton.addEventListener('click', failureStateRetryCallback);
+                cancelButton.addEventListener('click', failureStateCancelCallback);
+
+                window.onerror = function (e) {
+                    console.log(String(e));
+                    return true;
+                };
+
+                if (debug) {
+                    // mockSuccess()
+                    mockFailure();
+                } else {
+                    setTimeout(function () {
+                        setCurrentStep(slugs.downloading);
+                        external[slugs.invoke]('download');
+                    }, 1000);
+                }
+            }
+
+            function mockFailure() {
+                console.log('mocking Failure');
+                setTimeout(function () {
                     setCurrentStep(slugs.downloading);
-                    external[slugs.invoke]('download');
+                    progressBarFilled.style.width = '50%';
                 }, 1000);
+                setTimeout(function () {
+                    setCurrentStep(slugs.verifying);
+                    progressBarFilled.style.width = '100%';
+                    progressBarScroller.style.visiblity = 'visible';
+                }, 2000);
+                setTimeout(function () {
+                    setFailureState(slugs.verifying);
+                }, 3000);
             }
-        }
 
-        function mockFailure() {
-            console.log('mocking Failure');
-            setTimeout(function() {
-                setCurrentStep(slugs.downloading);
-                progressBarFilled.style.width = '50%';
-            }, 1000);
-            setTimeout(function() {
-                setCurrentStep(slugs.verifying);
-                progressBarFilled.style.width = '100%';
-                progressBarScroller.style.visiblity = 'visible';
-            }, 2000);
-            setTimeout(function() {
-                setFailureState(slugs.verifying);
-            }, 3000);
-        }
+            function mockSuccess() {
+                console.log('mocking Success');
+                setTimeout(function () {
+                    setCurrentStep(slugs.downloading);
+                    progressBarFilled.style.width = '50%';
+                }, 1000);
+                setTimeout(function () {
+                    setCurrentStep(slugs.verifying);
+                    progressBarFilled.style.width = '100%';
+                    progressBarScroller.style.visibility = 'visible';
+                }, 2000);
+                setTimeout(function () {
+                    setCurrentStep(slugs.installing);
+                }, 3000);
+                setTimeout(function () {
+                    setCurrentStep(slugs.finished);
+                }, 4000);
+            }
 
-        function mockSuccess() {
-            console.log('mocking Success');
-            setTimeout(function() {
-                setCurrentStep(slugs.downloading);
-                progressBarFilled.style.width = '50%';
-            }, 1000);
-            setTimeout(function() {
-                setCurrentStep(slugs.verifying);
+            function setCurrentStep(next) {
+                console.log('currentStep', next);
+                curr = next;
+                var currIndex = steps[curr];
+                var lastIndex = currIndex - 1;
+
+                if (curr !== slugs.downloading) {
+                    stepDots[lastIndex].classList.remove('step-dot--active');
+                    stepDots[lastIndex].classList.add('step-dot--complete');
+                    stepDashes[lastIndex].classList.add('step-dash--complete');
+                    stepLabels[lastIndex].classList.add('step-label--complete');
+                }
+
+                stepDots[currIndex].classList.add('step-dot--active');
+                stepLabels[currIndex].classList.add('step-label--active');
+            }
+
+            function setFailureState(step) {
+                var capitalized = step.split('')[0].toUpperCase() + step.slice(1);
+                var currIndex = steps[step];
+
+                stepDots[currIndex].classList.add('step-dot--failed');
+                if (currIndex > 0) {
+                    stepDashes[currIndex - 1].classList.add('step-dash--failed');
+                }
+                progressBarFilled.classList.add('filled--failed');
+                progressBarScroller.style.animation = undefined;
+                progressDescriptionText.innerHTML = capitalized + ' failed...';
+                progressDescriptionQuantify.style.display = 'none';
+                failureStateControls.style.display = 'block';
+            }
+
+            domReady(init.bind(this));
+
+            function downloadProgress(v, total, downloaded) {
+                if (!downloadSize) downloadSize = Math.ceil(total / 1e6);
+                if (!downloadVersion) downloadVersion = v;
+                progressDescriptionText.innerHTML = 'Downloading Dashboard v' + downloadVersion;
+                progressDescriptionQuantify.innerHTML = (downloaded / 1e6).toFixed(1) + ' / ' + downloadSize + ' MB';
+                var percent = Math.max((downloaded / total) * 100, 2);
+                progressBarFilled.style.width = '' + percent + '%';
+            }
+
+            function downloadFailed(e) {
+                console.log('download failed: ' + e);
+                setFailureState(slugs.downloading);
+            }
+
+            function downloadComplete(e) {
                 progressBarFilled.style.width = '100%';
+                progressDescriptionQuantify.style.display = 'none';
+                progressDescriptionText.innerHTML = 'Verifying Dashboard v' + downloadVersion;
                 progressBarScroller.style.visibility = 'visible';
-            }, 2000);
-            setTimeout(function() {
-                setCurrentStep(slugs.installing);
-            }, 3000);
-            setTimeout(function() {
-                setCurrentStep(slugs.finished);
-            }, 4000);
-        }
 
-        function setCurrentStep(next) {
-            console.log('currentStep', next);
-            curr = next;
-            const currIndex = steps[curr];
-            const lastIndex = currIndex - 1;
-
-            if (curr !== slugs.downloading) {
-                stepDots[lastIndex].classList.remove('step-dot--active');
-                stepDots[lastIndex].classList.add('step-dot--complete');
-                stepDashes[lastIndex].classList.add('step-dash--complete');
-                stepLabels[lastIndex].classList.add('step-label--complete');
+                setCurrentStep.call(this, slugs.verifying);
+                external[slugs.invoke]('verify');
             }
 
-            stepDots[currIndex].classList.add('step-dot--active');
-            stepLabels[currIndex].classList.add('step-label--active');
-        }
+            function verificationComplete(e) {
+                setCurrentStep.call(this, slugs.installing);
+                external[slugs.invoke]('apply');
+                progressDescriptionText.innerHTML = 'Installing Dashboard v' + downloadVersion;
+            }
 
-        function setFailureState(step) {
-            const capitalized = step.split('')[0].toUpperCase() + step.slice(1);
-            const currIndex = steps[step];
+            function verificationFailed(e) {
+                console.log('verification failed: ' + e);
+                setFailureState('verification');
+            }
 
-            stepDots[currIndex].classList.add('step-dot--failed');
-            currIndex > 0 && stepDashes[currIndex - 1].classList.add('step-dash--failed');
-            progressBarFilled.classList.add('filled--failed');
-            progressBarScroller.style.animation = undefined;
-            progressDescriptionText.innerHTML = capitalized + ' failed...';
-            progressDescriptionQuantify.style.display = 'none';
-            failureStateControls.style.display = 'block';
-        }
+            function updateComplete(e) {
+                console.log(e);
+                setCurrentStep.call(this, slugs.finished);
+                progressDescriptionText.innerHTML = 'Dashboard v' + downloadVersion + ' installed!';
+                external[slugs.invoke]('launch');
+            }
 
-        domReady(init.bind(this));
+            function updateFailed(e) {
+                console.error('update failed: ' + e);
+                setFailureState('updating');
+            }
 
-        function downloadProgress(v, total, downloaded) {
-            if (!downloadSize) downloadSize = Math.ceil(total / 1e6);
-            if (!downloadVersion) downloadVersion = v;
-            progressDescriptionText.innerHTML = 'Downloading Dashboard v' + downloadVersion;
-            progressDescriptionQuantify.innerHTML = (downloaded / 1e6).toFixed(1) + ' / ' + downloadSize + ' MB';
-            const percent = Math.max((downloaded / total) * 100, 2);
-            progressBarFilled.style.width = ''+percent+'%';
-        }
+            function failureStateCancelCallback(e) {
+                e.preventDefault();
+                console.log('cancel callback');
+                // external cancel call here
+            }
 
-        function downloadFailed(e) {
-            console.log('download failed: ' + e);
-            setFailureState(slugs.downloading);
-        }
-
-        function downloadComplete(e) {
-            progressBarFilled.style.width = '100%';
-            progressDescriptionQuantify.style.display = 'none';
-            progressDescriptionText.innerHTML = 'Verifying Dashboard v' + downloadVersion;
-            progressBarScroller.style.visibility = 'visible';
-
-            setCurrentStep.call(this, slugs.verifying);
-            external[slugs.invoke]('verify');
-        }
-
-        function verificationComplete(e) {
-            setCurrentStep.call(this, slugs.installing);
-            external[slugs.invoke]('apply');
-            progressDescriptionText.innerHTML = 'Installing Dashboard v' + downloadVersion;
-        }
-
-        function verificationFailed(e) {
-            console.log('verification failed: ' + e);
-            setFailureState('verification');
-        }
-
-        function updateComplete(e) {
-            console.log(e);
-            setCurrentStep.call(this, slugs.finished);
-            progressDescriptionText.innerHTML = 'Dashboard v' + downloadVersion + ' installed!';
-            external[slugs.invoke]('launch');
-        }
-
-        function updateFailed(e) {
-            console.error('update failed: ' + e);
-            setFailureState('updating');
-        }
-
-        function failureStateCancelCallback(e) {
-            e.preventDefault();
-            console.log('cancel callback');
-            // external cancel call here
-        }
-
-        function failureStateRetryCallback(e) {
-            e.preventDefault();
-            external[slugs.invoke]('retry');
-            console.log('retry callback');
-            // external retry call here
-        }
+            function failureStateRetryCallback(e) {
+                e.preventDefault();
+                external[slugs.invoke]('retry');
+                console.log('retry callback');
+                // external retry call here
+            }
     </script>
 </head>
 
