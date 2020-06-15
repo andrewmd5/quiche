@@ -1,6 +1,6 @@
 [package]
 name = "bootstrapper"
-version = "2.0.3"
+version = "2.0.5"
 authors = ["Andrew Sampson <andrew@rainway.io>"]
 edition = "2018"
 
@@ -12,7 +12,7 @@ ProductName = "Rainway Bootstrapper"
 
 [package.rainway]
 dotnet_framework_url = "https://dotnet.microsoft.com/download/thank-you/net472"
-media_pack_url = "https://www.microsoft.com/en-us/software-download/mediafeaturepack"
+media_pack_url = "https://rainway.com/support/troubleshooting/windows-n-systems/"
 sentry_dns = "https://f3f4e8ff17b04538bffd1e8794e1dc05@sentry.io/1548204"
 service_name = "RainwayRadar"
 

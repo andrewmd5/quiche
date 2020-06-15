@@ -62,7 +62,6 @@ fn main() -> Result<(), BootstrapError> {
             }
         }
     }
-    sentry::capture_message("Bootstrapper Completed.", sentry::Level::Info);
     Ok(())
 }
 
