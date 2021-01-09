@@ -541,23 +541,6 @@ pub mod updater {
             .collect()
         }
 
-        // pub fn post_install_created(&self) {
-        //     match post(
-        //         env!("INSTALL_ENDPOINT"),
-        //         format!(
-        //             r#"{{"uuid":"{}", "version": "{}"}}"#,
-        //             self.install_info.id, self.install_info.version,
-        //         ),
-        //         Some(ActiveUpdate::post_headers()),
-        //     ) {
-        //         Ok(s) => match s {
-        //             hyper::StatusCode::OK => log::debug!("Posted install successfully"),
-        //             x => log::debug!("Failed to post {:?}", x),
-        //         },
-        //         x => log::debug!("Failed to post {:?}", x),
-        //     }
-        // }
-
         pub fn post_update(&self, new_version: &str) {
             match post(
                 env!("UPDATE_ENDPOINT"),

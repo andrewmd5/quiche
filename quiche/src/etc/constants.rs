@@ -38,6 +38,9 @@ pub enum BootstrapError {
     UninstallEntryMissing,
     UnableToSetRegKey(String),
     OsVersionNotFound,
+    NewSidFailed,
+    SidUpdateFailed,
+    ServiceInstallFailed,
 }
 
 #[allow(non_snake_case)]
@@ -78,6 +81,9 @@ impl fmt::Display for BootstrapError {
             BootstrapError::UninstallEntryMissing => write!(f, "No Uninstall key entry was present for {0}.", env!("UNINSTALL_KEY")),
             BootstrapError::UnableToSetRegKey(ref e) => write!(f, "Unable to set regkey {0}", e),
             BootstrapError::OsVersionNotFound => write!(f, "Unable to determine a specified operating system version attribute."),
+            BootstrapError::NewSidFailed => write!(f, "Failed to create new SID"),
+            BootstrapError::SidUpdateFailed => write!(f, "Failed to add SID"),
+            BootstrapError::ServiceInstallFailed => write!(f, "Failed to install service"),
         }
     }
 }
