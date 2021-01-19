@@ -2,7 +2,9 @@ use crate::ui::messagebox::show_error;
 use quiche::etc::constants::BootstrapError;
 use quiche::os::process::get_processes;
 use quiche::os::service::{install_service, service_exist, start_service, WindowsService};
-use quiche::os::windows::{detach_rdp_session, get_dotnet_framework_version, get_system_info, WindowsVersion};
+use quiche::os::windows::{
+    detach_rdp_session, get_dotnet_framework_version, get_system_info, WindowsVersion,
+};
 use std::path::PathBuf;
 use std::process;
 /// returns an error if the bootstrapper is already open
@@ -20,7 +22,7 @@ pub fn error_on_duplicate_session() -> Result<(), BootstrapError> {
     Ok(())
 }
 
-/// launches the Rainway service (Radar)
+/// launches the Rainway service (Rainway.Service)
 pub fn launch_rainway(install_path: &PathBuf) {
     if detach_rdp_session() {
         log::info!("Session was detached");
@@ -29,11 +31,11 @@ pub fn launch_rainway(install_path: &PathBuf) {
     }
     if !service_exist(env!("RAINWAY_SERVICE")) {
         let mut exe = install_path.to_path_buf();
-        exe.push("radar\\Radar.exe");
+        exe.push("Rainway.Service.exe");
         if exe.exists() && exe.is_file() {
             let service = WindowsService {
                 name: env!("RAINWAY_SERVICE").to_string(),
-                display_name: "Rainway Radar".to_string(),
+                display_name: "Rainway Service".to_string(),
                 arguments: vec![],
                 executable_path: exe,
             };
@@ -62,10 +64,8 @@ pub fn kill_rainway() {
     if let Some(process_list) = get_processes() {
         for process in process_list {
             if process.name() == "Rainway.exe"
-                || process.name() == "CefSharp.BrowserSubprocess.exe"
-                || process.name() == "Radar.exe"
-                || process.name() == "LaunchRainway.exe"
-                || process.name() == "RainwayInstaller.exe"
+                || process.name() == "Rainway.Daemon.exe"
+                || process.name() == "Rainway.Service.exe"
             {
                 if process.kill() {
                     log::info!("Rainway process {} terminated", process.name());
