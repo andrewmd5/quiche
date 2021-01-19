@@ -1,5 +1,10 @@
 use crate::etc::constants::BootstrapError;
 use crate::os::process::get_current_process;
+use crate::os::winver::{
+    is_windows10_or_greater, is_windows7_or_greater, is_windows8_or_greater,
+    is_windows8_point1_or_greater, is_windows_server, is_windows_vista_or_greater,
+    is_windows_xpor_greater,
+};
 use regex::Regex;
 use std::env::var_os;
 use std::path::PathBuf;
@@ -11,11 +16,6 @@ use winreg::enums::KEY_ALL_ACCESS;
 use winreg::types::ToRegValue;
 use winreg::RegKey;
 use winreg::HKEY;
-use crate::os::winver::{
-    is_windows10_or_greater, is_windows7_or_greater, is_windows8_or_greater,
-    is_windows8_point1_or_greater, is_windows_server, is_windows_vista_or_greater,
-    is_windows_xpor_greater,
-};
 /// dism.exe will return exit code 740 if it is launched
 /// from a non-elevated process.
 static ELEVATION_REQUIRED: i32 = 740;
@@ -96,13 +96,12 @@ pub fn get_system_info() -> Result<SystemInfo, BootstrapError> {
     //We only support the above mentioned operating systems.
     system_info.windows_version = match get_windows_version() {
         Ok(v) => v,
-        Err(e) => return Err(e)
+        Err(e) => return Err(e),
     };
-   // if current_major_version_number == 10;
+    // if current_major_version_number == 10;
     system_info.is_x64 = is_x64();
     Ok(system_info)
 }
-
 
 /// Parses the registry to determine if the host OS is x32 or x64.
 fn is_x64() -> bool {
@@ -315,7 +314,7 @@ pub fn get_reg_key(handle: RegistryHandle, key: &str) -> Result<RegKey, Bootstra
     }
 }
 
-pub fn delete_reg_key(handle: RegistryHandle, key: &str)  {
+pub fn delete_reg_key(handle: RegistryHandle, key: &str) {
     let hkey = RegKey::predef(handle as isize as HKEY);
     if let Ok(_) = hkey.delete_subkey_all(&key) {
         log::info!("Deleted key");
@@ -365,4 +364,70 @@ impl Default for WindowsVersion {
     fn default() -> Self {
         WindowsVersion::WindowsXp
     }
+}
+
+pub fn is_run_as_admin() -> bool {
+    use std::ptr;
+    use winapi::um::securitybaseapi::{AllocateAndInitializeSid, CheckTokenMembership, FreeSid};
+    use winapi::um::winnt::{
+        DOMAIN_ALIAS_RID_ADMINS, SECURITY_BUILTIN_DOMAIN_RID, SECURITY_NT_AUTHORITY,
+        SID_IDENTIFIER_AUTHORITY,
+    };
+    unsafe {
+        let mut administrator_group = ptr::null_mut();
+        if AllocateAndInitializeSid(
+            &mut SID_IDENTIFIER_AUTHORITY {
+                Value: SECURITY_NT_AUTHORITY,
+            },
+            2,
+            SECURITY_BUILTIN_DOMAIN_RID,
+            DOMAIN_ALIAS_RID_ADMINS,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            &mut administrator_group,
+        ) == 0
+        {
+            FreeSid(administrator_group);
+            return false;
+        }
+        let mut is_member = 0;
+        if CheckTokenMembership(ptr::null_mut() as _, administrator_group, &mut is_member) == 0 {
+            FreeSid(administrator_group);
+        }
+        is_member != 0
+    }
+}
+
+pub fn is_elevated() -> bool {
+    use std::mem;
+    use winapi::shared::minwindef::{DWORD, LPVOID};
+    use winapi::um::processthreadsapi::{GetCurrentProcess, OpenProcessToken};
+    use winapi::um::securitybaseapi::GetTokenInformation;
+    use winapi::um::winnt::{TokenElevation, HANDLE, TOKEN_ELEVATION, TOKEN_QUERY};
+    unsafe {
+        let mut current_token_ptr: HANDLE = mem::zeroed();
+        let mut token_elevation: TOKEN_ELEVATION = mem::zeroed();
+        let token_elevation_type_ptr: *mut TOKEN_ELEVATION = &mut token_elevation;
+        let mut size: DWORD = 0;
+
+        let result = OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut current_token_ptr);
+
+        if result != 0 {
+            let result = GetTokenInformation(
+                current_token_ptr,
+                TokenElevation,
+                token_elevation_type_ptr as LPVOID,
+                mem::size_of::<winapi::um::winnt::TOKEN_ELEVATION_TYPE>() as u32,
+                &mut size,
+            );
+            if result != 0 {
+                return token_elevation.TokenIsElevated != 0;
+            }
+        }
+    }
+    false
 }
