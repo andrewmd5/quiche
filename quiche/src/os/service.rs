@@ -1,11 +1,15 @@
 use crate::etc::constants::BootstrapError;
-use std::ffi::{OsString, OsStr};
+use crate::os::dacl;
+use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
+
 use windows_service::{
-    service::{ServiceAccess, ServiceState, ServiceStartType, ServiceInfo, ServiceErrorControl, ServiceType},
+    service::{
+        ServiceAccess, ServiceErrorControl, ServiceInfo, ServiceStartType, ServiceState,
+        ServiceType,
+    },
     service_manager::{ServiceManager, ServiceManagerAccess},
 };
-
 
 pub struct WindowsService {
     pub name: String,
@@ -37,9 +41,14 @@ pub fn install_service(service: WindowsService) -> Result<bool, BootstrapError> 
         Err(_e) => return Err(BootstrapError::ServiceConnectionFailure),
     };
 
-    let arguments: Vec<OsString> = service.arguments.into_iter().map(|x| OsString::from(x)).rev().collect();
+    let arguments: Vec<OsString> = service
+        .arguments
+        .into_iter()
+        .map(|x| OsString::from(x))
+        .rev()
+        .collect();
     let service_info = ServiceInfo {
-        name: OsString::from(service.name),
+        name: OsString::from(service.name.clone()),
         display_name: OsString::from(service.display_name),
         service_type: ServiceType::OWN_PROCESS,
         start_type: ServiceStartType::OnDemand,
@@ -50,9 +59,25 @@ pub fn install_service(service: WindowsService) -> Result<bool, BootstrapError> 
         account_name: None, // run as System
         account_password: None,
     };
-    match service_manager.create_service(service_info, ServiceAccess::empty()) {
-        Ok(_o) => return Ok(true),
-        Err(_e) => return Ok(false),
+
+    if let Err(_) = service_manager.create_service(service_info, ServiceAccess::empty()) {
+        return Err(BootstrapError::ServiceInstallFailed);
+    }
+
+    // now update the permissions so that any user can start the service
+    // if the previous call to create a manager didnt fail then this
+    // shouldnt fail either
+    let custom_manager = match dacl::CustomServiceManager::new() {
+        Ok(sm) => sm,
+        Err(_e) => return Err(BootstrapError::ServiceConnectionFailure),
+    };
+
+    match custom_manager.change_service_dacl(service.name.as_ref()) {
+        Ok(_) => {
+            log::info!("Successfully updated service");
+            Ok(true)
+        }
+        Err(_) => Ok(false),
     }
 }
 
@@ -81,7 +106,7 @@ pub fn start_service(service_name: &str) -> Result<bool, BootstrapError> {
         }
     }
     match service.start(&[OsStr::new("Started from Rust!")]) {
-        Ok(_o) => return Ok(true),
-        Err(_e) => return Ok(false),
+        Ok(_o) => Ok(true),
+        Err(_e) => Err(BootstrapError::ServiceOpenFailure),
     }
 }

@@ -6,15 +6,15 @@ mod ui;
 
 use log::Level;
 use quiche::etc::constants::{is_compiled_for_64_bit, BootstrapError};
+use quiche::io::ico::IconDir;
+use quiche::os::windows::detach_rdp_session;
+use quiche::os::windows::{is_elevated, is_run_as_admin};
+use quiche::updater::{is_installed, ActiveUpdate, UpdateType};
 use rainway::{
     check_system_compatibility, error_on_duplicate_session, kill_rainway, launch_rainway,
 };
-
-use quiche::io::ico::IconDir;
-use quiche::os::windows::detach_rdp_session;
-use quiche::updater::{is_installed, ActiveUpdate, UpdateType};
 use rust_embed::RustEmbed;
-use ui::messagebox::{show_error, show_error_with_url};
+use ui::messagebox::{show_error, show_error_with_url, try_elevate};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
 use web_view::{Content, Icon, WVResult, WebView};
 #[derive(RustEmbed)]
@@ -131,6 +131,13 @@ fn run() -> Result<(), BootstrapError> {
             return Ok(());
         }
         log::warn!("the current Rainway installation requires an update.");
+    }
+
+    // at this point we know we need to either update or install
+    // so if we are not already elevated then go elevate ourselves
+    if !is_elevated() || !is_run_as_admin() {
+        log::warn!("elevated: {}", try_elevate());
+        std::process::exit(0);
     }
 
     let resources = load_resources()?;

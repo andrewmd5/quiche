@@ -1,3 +1,4 @@
+mod dacl;
 pub mod files;
 pub mod guid;
 pub mod process;
