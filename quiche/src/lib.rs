@@ -575,7 +575,7 @@ pub mod updater {
             }
         }
 
-        pub fn try_self_care(&mut self) -> Result<(), BootstrapError> {
+        pub fn start_self_update(&mut self) -> Result<(), BootstrapError> {
             use std::fs::remove_file;
             let mut new_bootstrapper = self.install_info.path.clone();
             let mut old_bootstrapper = self.install_info.path.clone();
@@ -585,11 +585,19 @@ pub mod updater {
             if old_bootstrapper.exists() {
                 remove_file(&old_bootstrapper)?;
             }
-            if !new_bootstrapper.exists() {
-                return Ok(());
-            }
             swap_files(&std::env::current_exe()?, &new_bootstrapper)?;
             Ok(())
+        }
+
+        pub fn should_self_update(&mut self) -> Result<bool, BootstrapError> {
+            let mut new_bootstrapper = self.install_info.path.clone();
+            let current_exe = get_filename(&std::env::current_exe()?);
+            new_bootstrapper.push(format!("{}_new", current_exe));
+
+            if !new_bootstrapper.exists() {
+                return Ok(false);
+            }
+            Ok(true)
         }
     }
 
@@ -740,7 +748,7 @@ pub mod updater {
         let log_file = format!("{}", current_exe.replace(".exe", ".log"));
         let old_file = format!("{}_old", current_exe);
         let new_file = format!("{}_new", current_exe);
-        let ignored_files = vec![current_exe, log_file, old_file, new_file];
+        let ignored_files = vec![current_exe, log_file];
 
         log::debug!("update_staging_path == {}", &update_staging_path.display());
 

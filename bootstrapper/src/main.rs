@@ -89,8 +89,18 @@ fn run() -> Result<(), BootstrapError> {
             launch_rainway(&update.install_info.path);
             return Err(e);
         }
-        if let Err(e) = update.try_self_care() {
-            log::error!("could not self-update the bootstrapper. {}", e);
+        let should_self_update = match update.should_self_update() {
+            Ok(_) => true,
+            Err(_) =>  false
+        };
+        if should_self_update {
+            if !is_elevated() || !is_run_as_admin() {
+                log::warn!("elevated: {}", try_elevate());
+                std::process::exit(0);
+            }
+            if let Err(e) = update.start_self_update() {
+                log::error!("could not self-update the bootstrapper. {}", e);
+            }
         }
         update.update_type = UpdateType::Patch;
     }
