@@ -73,7 +73,7 @@ impl CustomServiceManager {
         match acl.allow(
             sid.as_ptr() as PSID,
             false,
-            winsvc::SERVICE_START | winsvc::SERVICE_STOP | winnt::READ_CONTROL | winnt::DELETE,
+            winsvc::SERVICE_START | winsvc::SERVICE_STOP | winnt::READ_CONTROL | winnt::DELETE
         ) {
             Ok(status) => {
                 if !status {

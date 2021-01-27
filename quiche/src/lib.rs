@@ -380,7 +380,7 @@ pub mod updater {
 
         /// returns a list of all the files inside of a releases package.zip
         pub fn get_package_files(&self) -> Vec<String> {
-            self.manifest.package.files.clone()
+           self.manifest.package.files.clone()
         }
         /// returns the temporary file path where downloaded packages will be written.
         pub fn get_temp_name(&self) -> String {
@@ -664,8 +664,13 @@ pub mod updater {
     }
 
     /// checks if all the files present in a vector exist in a given directory.
-    fn validate_files(input: &PathBuf, target_files: &Vec<String>) -> bool {
-        dir_contains_all_files(&Path::new(input), target_files)
+    fn validate_files(input: &PathBuf, target_files: &std::vec::Vec<std::string::String>) -> bool {
+        let mut files = target_files.clone();
+        if let Ok(current_exe_path) = &std::env::current_exe() {
+            let new_exe = format!("{}_new", get_filename(current_exe_path));
+            files.retain(|s| s != &new_exe);
+        }
+        dir_contains_all_files(&Path::new(input), &files)
     }
 
     /// checks if the downloaded file hash matches that of the one in the manifest.

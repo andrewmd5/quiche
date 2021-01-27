@@ -64,15 +64,17 @@ pub fn install_service(service: WindowsService) -> Result<bool, BootstrapError> 
         return Err(BootstrapError::ServiceInstallFailed);
     }
 
-    // now update the permissions so that any user can start the service
-    // if the previous call to create a manager didnt fail then this
-    // shouldnt fail either
+    // if the previous call to create a manager didnt fail then this shouldnt fail either
+    grant_start_access_rights(&service.name)
+}
+
+/// Update the permissions so that any user can start the specified service
+pub fn grant_start_access_rights(service_name: &str) -> Result<bool, BootstrapError> {
     let custom_manager = match dacl::CustomServiceManager::new() {
         Ok(sm) => sm,
         Err(_e) => return Err(BootstrapError::ServiceConnectionFailure),
     };
-
-    match custom_manager.change_service_dacl(service.name.as_ref()) {
+    match custom_manager.change_service_dacl(service_name) {
         Ok(_) => {
             log::info!("Successfully updated service");
             Ok(true)

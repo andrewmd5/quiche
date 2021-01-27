@@ -14,7 +14,7 @@ use rainway::{
     check_system_compatibility, error_on_duplicate_session, kill_rainway, launch_rainway,
 };
 use rust_embed::RustEmbed;
-use ui::messagebox::{show_error, show_error_with_url, try_elevate};
+use ui::native::{show_error, show_error_with_url, try_elevate, local_app_data};
 use ui::view::{apply_update, download_update, launch_and_close, verify_update};
 use web_view::{Content, Icon, WVResult, WebView};
 #[derive(RustEmbed)]
@@ -279,7 +279,7 @@ fn setup_logging(verbosity: u64) -> Result<(), fern::InitError> {
                 message
             ))
         })
-        .chain(File::create(format!("{}.log", env!("CARGO_PKG_NAME")))?);
+        .chain(File::create(format!("{}\\Rainway\\Dashboard\\{}.log", local_app_data().unwrap().into_os_string().into_string().unwrap(), env!("CARGO_PKG_NAME")))?);
 
     let stdout_config = fern::Dispatch::new()
         .format(move |out, message, record| {

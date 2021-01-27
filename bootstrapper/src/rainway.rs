@@ -1,9 +1,9 @@
-use crate::ui::messagebox::show_error;
+use crate::ui::native::{show_error, try_elevate};
 use quiche::etc::constants::BootstrapError;
 use quiche::os::process::get_processes;
-use quiche::os::service::{install_service, service_exist, start_service, WindowsService};
+use quiche::os::service::{install_service, service_exist, start_service, WindowsService, grant_start_access_rights};
 use quiche::os::windows::{
-    detach_rdp_session, get_dotnet_framework_version, get_system_info, WindowsVersion,
+    detach_rdp_session, get_dotnet_framework_version, get_system_info, WindowsVersion, is_elevated, is_run_as_admin
 };
 use std::path::PathBuf;
 use std::process;
@@ -48,10 +48,22 @@ pub fn launch_rainway(install_path: &PathBuf) {
             }
         }
     }
+    
     if service_exist(env!("RAINWAY_SERVICE")) {
+        if is_elevated() || is_run_as_admin() {
+            match grant_start_access_rights(env!("RAINWAY_SERVICE")) {
+                Ok(s) => log::info!("DACL start access rights granted: {}", s),
+                Err(e) =>  log::warn!("DACL grant error: {}", e),
+            }
+        }
         match start_service(env!("RAINWAY_SERVICE")) {
             Ok(s) => log::info!("Rainway service started: {}", s),
             Err(e) => {
+
+                if !is_elevated() || !is_run_as_admin() {
+                    log::warn!("elevated: {}", try_elevate());
+                    std::process::exit(0);
+                }
                 show_error("Rainway Startup Failure", format!("{}", e));
                 sentry::capture_message(format!("{}", e).as_str(), sentry::Level::Error);
             }
